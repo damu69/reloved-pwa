@@ -29,6 +29,7 @@ function newNotifs(){return D.notifs.filter(function(n){return n.at>(D.me.notifS
 function toast(m){var d=document.createElement("div");d.className="toast";d.textContent=m;document.getElementById("app").appendChild(d);clearTimeout(toastT);toastT=setTimeout(function(){d.remove()},2200)}
 async function w(fn,ok){if(!canWrite){toast("You have view-only access, so changes are off");return false}
   try{await fn();if(ok)toast(ok);return true}catch(e){toast("Could not save ("+(e&&e.code||"error")+")");return false}}
+function rpc(fn,args){return sb.rpc(fn,args).then(function(r){if(r.error)throw {code:r.error.code,message:r.error.message};if(db&&db.ping)db.ping();return r})}
 function saveMe(){return db.doc("data/users/"+U+"/me").set(D.me)}
 function notify(toId,text,ref){if(!toId||toId===U||toId.indexOf("seed_")===0)return Promise.resolve();return db.collection("notifs").add({toId:toId,text:text,at:Date.now(),ref:ref||null})}
 
@@ -220,9 +221,9 @@ async function sendMsg(cid,m,preview){var c=by(convs(),cid);if(!c)return false;
  return w(async function(){await db.collection("convs/"+cid+"/msgs").add(Object.assign({from:U,at:Date.now()},m));var u={lastText:preview,lastAt:Date.now(),lastFrom:U};u[c.buyerId===U?"readB":"readS"]=Date.now();await db.doc("convs/"+cid).update(u)})}
 async function setOrderStatus(o,st){
  var ok=await w(async function(){
-  await db.doc("orders/"+o.id).update({status:st});
-  if(st==="cancelled")await db.doc("items/"+o.itemId).update({status:"active"}).catch(function(){});
-  if(st==="completed"){var ss=seller(o.sellerId);await db.doc("sellers/"+o.sellerId).update({balance:Math.round(((ss&&ss.balance||0)+o.price)*100)/100})}
+  if(st==="completed"){await rpc("rl_complete_order",{p_order:o.id})}
+  else{await db.doc("orders/"+o.id).update({status:st});
+  if(st==="cancelled")await rpc("rl_item_status",{p_item:o.itemId,p_status:"active"}).catch(function(){})}
   await notify(U===o.buyerId?o.sellerId:o.buyerId,"Order “"+o.title+"”: "+stLabel(st).toLowerCase(),{v:"order",p:o.id})});
  if(ok)toast("Order "+stLabel(st).toLowerCase())}
 
@@ -260,7 +261,7 @@ document.addEventListener("click",async function(e){
    var ok=await w(async function(){await new Promise(function(r){setTimeout(r,700)});
      var fresh=await db.doc("items/"+i).get();if(!fresh.exists||fresh.data().status!=="active")throw {code:"gone"};
      ref=await db.collection("orders").add({itemId:i,title:it2.title,hue:it2.hue==null?180:it2.hue,price:base,fee:f2,ship:sh.p,total:tot,buyerId:U,sellerId:it2.sellerId,status:"paid",at:Date.now(),addr:k2.ship==="meet"?"Meet and collect":k2.name+", "+k2.street+", "+k2.city});
-     await db.doc("items/"+i).update({status:"sold"});
+     await rpc("rl_item_status",{p_item:i,p_status:"sold"});
      if(k2.pay==="wallet")await db.doc("sellers/"+U).update({balance:Math.round(((me.balance||0)-tot)*100)/100});
      if(c3)await db.collection("convs/"+c3.id+"/msgs").add({from:U,at:Date.now(),type:"sys",text:"Item bought for "+eur(tot)+" with Buyer Protection"});
      await notify(it2.sellerId,"“"+it2.title+"” sold for "+eur(base),{v:"order",p:ref.id})});

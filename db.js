@@ -46,7 +46,12 @@
         update: function (d) {
           return fetchOne().then(function (s) {
             if (!s.exists) throw { code: "invalid_argument", message: "Document does not exist" };
-            return ref.set(Object.assign({}, s.data(), d));
+            return sb.from("docs").update({ data: Object.assign({}, s.data(), d), updated_at: new Date().toISOString() })
+              .eq("collection", col).eq("id", id).select("id").then(function (r) {
+                if (r.error) throw err(r.error);
+                if (!r.data || !r.data.length) throw { code: "permission-denied", message: "Not allowed" };
+                pingAll();
+              });
           });
         },
         delete: function () { return sb.from("docs").delete().eq("collection", col).eq("id", id).then(chk); },
@@ -84,6 +89,6 @@
       return q;
     }
 
-    return { collection: function (c) { return cref(c); }, doc: dref };
+    return { collection: function (c) { return cref(c); }, doc: dref, ping: pingAll };
   };
 })();

@@ -23,6 +23,9 @@ export async function setup(): Promise<{ app: FastifyInstance; pool: pg.Pool; cf
     LOG_LEVEL: "silent",
     DEV_EXPOSE_RESET_TOKEN: "true",
     CORS_ORIGINS: "http://localhost:5173",
+    DATA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
+    STORAGE_DRIVER: "local",
+    STORAGE_LOCAL_DIR: `/tmp/reloved-test-storage/${name}`,
   } as any);
   const pool = new pg.Pool({ connectionString: cfg.DATABASE_URL, max: 20 });
   await migrate(pool, fileURLToPath(new URL("../migrations", import.meta.url)), () => {});
@@ -48,3 +51,13 @@ export const cookieOf = (res: { headers: Record<string, unknown> }): string | un
 };
 
 export const CSRF = { "x-requested-with": "reloved", origin: "http://localhost:5173" };
+
+// Builds a multipart/form-data body with one file part.
+export function multipartFile(filename: string, content: Buffer, contentType = "application/octet-stream") {
+  const boundary = "----relovedtest" + Math.random().toString(16).slice(2);
+  const head = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`);
+  const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
+  return { payload: Buffer.concat([head, content, tail]), headers: { "content-type": `multipart/form-data; boundary=${boundary}` } };
+}
+export const PDF = Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
+export const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);

@@ -16,8 +16,9 @@ Base path `/api/v1`. JSON only. Every response carries an `x-request-id` header.
 | 401 | `UNAUTHENTICATED`, `SESSION_EXPIRED`, `INVALID_CREDENTIALS` |
 | 403 | `FORBIDDEN`, `ACCOUNT_SUSPENDED` |
 | 404 | `NOT_FOUND` (also used for records you may not see, so ids cannot be probed) |
-| 409 | `ACCOUNT_EXISTS`, `LAST_ADMIN` |
-| 422 | `INVALID_TRANSITION` |
+| 409 | `ACCOUNT_EXISTS`, `LAST_ADMIN`, `APPLICATION_EXISTS`, `STORE_NAME_TAKEN`, `GSTIN_IN_USE`, `TOO_MANY_DOCUMENTS` |
+| 413 / 415 | `FILE_TOO_LARGE` / `UNSUPPORTED_FILE_TYPE` |
+| 422 | `INVALID_TRANSITION`, `APPLICATION_INCOMPLETE`, `DOCUMENTS_NOT_ACCEPTED`, `BANK_ACCOUNT_MISSING`, `BANK_PROOF_REQUIRED` |
 | 429 | `RATE_LIMITED` |
 | 500 | `INTERNAL` (no internal details; quote the requestId to support) |
 
@@ -63,6 +64,37 @@ All need a Bearer token and the listed permission (held by the `admin` role).
 | `POST /admin/users/:id/suspend` body `{ reason }` | `admin.users.manage` | Revokes all their sessions at once; audited |
 | `POST /admin/users/:id/reactivate` body `{ reason }` | `admin.users.manage` | Audited |
 | `GET /admin/audit-logs?entity&entityId&actorUserId&action&from&to&limit&cursor` | `admin.audit.read` | Newest first |
+
+## Seller (signed-in user, own application only)
+
+Status flow: `draft` → `submitted` → `approved`, or back to `changes_requested` (seller edits and resubmits),
+or `rejected`. Approved sellers can be `suspended` and `reinstated`. The `seller` role exists only while approved.
+
+| Method and path | Body | Notes |
+| --- | --- | --- |
+| `POST /seller/application` | `displayName` (store name, unique), `businessName`, `businessType`, `pan`, `gstin?`, `addressLine1`, `addressLine2?`, `city`, `state`, `pincode`, `contactPhone` | 201. GSTIN must contain the PAN. PAN stored encrypted, shown as `XXXXXX1234` |
+| `GET /seller/application` | | Status, masked identifiers, documents, bank accounts, history, `missing` requirements |
+| `PATCH /seller/application` | any of the fields above | Only in `draft` or `changes_requested`. Changing PAN, GSTIN, business or address sends the matching accepted documents back to pending |
+| `PUT /seller/bank-account` | `accountHolderName`, `accountNumber`, `accountNumberConfirm`, `ifsc` | Encrypted, shown as `XXXX1234`. After approval the new account stays pending until an admin verifies it with a fresh bank proof |
+| `POST /seller/documents?docType=` | multipart/form-data, one `file` part | `pan_card`, `gst_certificate`, `address_proof`, `bank_proof`, `other`. PDF, JPEG, PNG or WebP by content, max 5 MB, max 20 kept. After approval only `bank_proof` |
+| `DELETE /seller/documents/:id` | | Only while editable |
+| `GET /seller/documents/:id/file` | | Download your own document |
+| `POST /seller/application/submit` | | 422 `APPLICATION_INCOMPLETE` lists what is missing |
+
+## Admin: sellers
+
+| Method and path | Permission | Notes |
+| --- | --- | --- |
+| `GET /admin/sellers?status&q&limit&cursor` | `admin.sellers.read` | |
+| `GET /admin/sellers/:id` | `admin.sellers.read` | Masked identifiers, documents, bank accounts, history with actors |
+| `GET /admin/sellers/:id/sensitive` | `admin.sellers.documents` | Full PAN and account numbers; audited |
+| `GET /admin/sellers/:id/documents/:docId/file` | `admin.sellers.documents` | Audited |
+| `POST /admin/sellers/:id/documents/:docId/review` | `admin.sellers.manage` | `{ decision: accepted or rejected, note }`; note required to reject |
+| `POST /admin/sellers/:id/approve` | `admin.sellers.manage` | Needs every required document accepted; verifies the bank account; grants the seller role |
+| `POST /admin/sellers/:id/request-changes`, `/reject`, `/suspend`, `/reinstate` | `admin.sellers.manage` | `{ reason }` required |
+| `POST /admin/sellers/:id/bank-accounts/:bankId/review` | `admin.sellers.manage` | After approval only; verifying needs an accepted bank proof uploaded after the account was entered |
+
+Admins can never act on their own seller account (403). Every action is in the audit log and the seller's status history.
 
 ## Health
 

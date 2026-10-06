@@ -21,6 +21,16 @@ const schema = z.object({
   // Number of reverse proxies in front of the API (e.g. 1 behind one load balancer). 0 = use the socket address.
   // Never trust the whole X-Forwarded-For chain: clients could fake their IP and dodge rate limits.
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
+  // 32 random bytes, base64. Encrypts PAN and bank account numbers. Losing it makes them unreadable;
+  // keep it in the secrets manager and back it up separately from the database.
+  DATA_ENCRYPTION_KEY: z.string().refine((v) => Buffer.from(v, "base64").length === 32, "must be 32 bytes, base64-encoded"),
+  // local: files on this machine's disk (development and tests only).
+  // supabase: private Supabase Storage bucket, accessed only by this server with the service-role key.
+  STORAGE_DRIVER: z.enum(["local", "supabase"]).default("local"),
+  STORAGE_LOCAL_DIR: z.string().default("./.storage"),
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
+  STORAGE_BUCKET: z.string().regex(/^[a-z0-9-]{3,63}$/).default("seller-kyc"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   // MOCK / TEMPORARY: returns the password-reset token in the API response because no email
   // provider exists yet. Must be false in production; startup refuses otherwise.
@@ -41,7 +51,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (c.COOKIE_SECURE !== "true") throw new Error("COOKIE_SECURE must be true in production");
     if (/change[-_]?me|example|secret123/i.test(c.JWT_SECRET)) throw new Error("JWT_SECRET looks like a placeholder");
     if (c.DATABASE_SSL === "off") throw new Error("DATABASE_SSL must be require or verify-full in production");
+    if (c.STORAGE_DRIVER !== "supabase") throw new Error("STORAGE_DRIVER must be supabase in production (local disk is lost on redeploy)");
     if (/localhost|127\.0\.0\.1|http:\/\//.test(c.CORS_ORIGINS)) throw new Error("CORS_ORIGINS must list only https production origins");
+  }
+  if (c.STORAGE_DRIVER === "supabase" && (!c.SUPABASE_URL || !c.SUPABASE_SERVICE_ROLE_KEY)) {
+    throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required when STORAGE_DRIVER=supabase");
   }
   return { ...c, corsOrigins: c.CORS_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean) };
 }

@@ -21,7 +21,7 @@ function ph(title, pid, imgId, size, extra) {
 }
 var HEART = '<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3 5 6.5 5c2 0 3.6 1.1 5.5 3 1.9-1.9 3.5-3 5.5-3C21 5 22.8 8.6 21.5 11.8 19.5 16.4 12 21 12 21z"/></svg>';
 var toastT;
-function toast(m) { var d = document.createElement("div"); d.className = "toast"; d.textContent = m; $("app").appendChild(d); clearTimeout(toastT); toastT = setTimeout(function () { d.remove(); }, 3200); }
+function toast(m) { Array.prototype.forEach.call(document.querySelectorAll(".toast"), function (x) { x.remove(); }); var d = document.createElement("div"); d.className = "toast"; d.textContent = m; $("app").appendChild(d); clearTimeout(toastT); toastT = setTimeout(function () { d.remove(); }, 3200); }
 function errText(e) {
   if (!e) return "Something went wrong.";
   if (e.code === "RATE_LIMITED") return "Too many tries. Please wait a few minutes and try again.";
@@ -274,7 +274,7 @@ V.profile = function () {
   if (!signedIn()) return head("Profile") + '<div class="empty"><h2>Welcome to Reloved</h2>Sign in to see your orders, favourites and addresses.<div style="margin-top:12px"><button class="btn" data-a="go" data-i="auth">Sign in or create account</button></div></div>' + docRows();
   var u = S.user, roles = (u.roles || []).filter(function (r) { return r !== "customer"; });
   return '<div class="bar"><span class="av" style="background:var(--accent);color:var(--accent-ink)">' + esc(String(u.fullName || u.email).slice(0, 1).toUpperCase()) + '</span><div style="flex:1;min-width:0"><h2>' + esc(u.fullName || "Your account") + '</h2><span class="muted small">' + esc(u.email) + "</span>" + roles.map(function (r) { return ' <span class="pill ok">' + esc(r) + "</span>"; }).join("") + "</div></div>" +
-    '<div class="list">' + row("O", "My orders", "", 'data-a="go" data-i="orders"') + row("♥", "Favourite items", Object.keys(S.wish).length || "", 'data-a="go" data-i="wish"') + row("A", "My addresses", "", 'data-a="go" data-i="addresses"') + row("S", "Settings", "", 'data-a="go" data-i="settings"') + "</div>" + docRows();
+    '<div class="list">' + row("O", "My orders", "", 'data-a="go" data-i="orders"') + ((u.roles || []).indexOf("seller") > -1 ? row("$", "Seller dashboard", "", 'data-a="tab" data-i="sell"') : "") + (S.perms.length ? row("★", "Admin", "", 'data-a="go" data-i="admin"') : "") + row("♥", "Favourite items", Object.keys(S.wish).length || "", 'data-a="go" data-i="wish"') + row("A", "My addresses", "", 'data-a="go" data-i="addresses"') + row("S", "Settings", "", 'data-a="go" data-i="settings"') + "</div>" + docRows();
 };
 function docRows() {
   return '<div class="list">' + row("?", "How it works", "", 'data-a="go" data-i="doc" data-j="how"') + row("i", "Help Centre", "", 'data-a="go" data-i="help"') + row("§", "Terms &amp; legal", "", 'data-a="go" data-i="legal"') + row("A", "About us", "", 'data-a="go" data-i="about"') + "</div>";
@@ -319,6 +319,7 @@ function render() {
   var tabs = [["home", "Home", '<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'], ["browse", "Browse", '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'], ["sell", "Sell", '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'], ["cart", "Cart", '<path d="M3 4h2l2.4 11h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/>'], ["profile", "Profile", '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>']];
   nav.innerHTML = tabs.map(function (t) { return '<button data-a="tab" data-i="' + t[0] + '" class="' + (!stack.length && tab === t[0] ? "on" : "") + '" aria-label="' + t[1] + '"><svg viewBox="0 0 24 24">' + t[2] + "</svg>" + t[1] + (t[0] === "cart" && n ? ' <span class="dot">' + n + "</span>" : "") + "</button>"; }).join("");
   if (same) main.scrollTop = keep;
+  if (window.RL) RL.hooks.forEach(function (f) { try { f(); } catch (e) { } });
 }
 function refresh() { if (typing()) { dirty = true; return; } render(); }
 document.addEventListener("focusout", function () { setTimeout(function () { if (dirty && !typing()) render(); }, 50); });
@@ -435,6 +436,7 @@ async function act(a, i, j, el) {
     case "savepw": try { await api.post("/auth/password/change", { currentPassword: $("pw0").value, newPassword: $("pw1").value }); toast("Password changed"); $("pw0").value = ""; $("pw1").value = ""; } catch (e) { toast(errText(e)); } return;
     case "theme": { var rt = document.documentElement, dark = getComputedStyle(rt).colorScheme === "dark"; rt.setAttribute("data-theme", dark ? "light" : "dark"); return; }
     case "install": if (deferredInstall) { deferredInstall.prompt(); deferredInstall = null; } else toast("On iPhone: Share, then Add to Home Screen. On Android: browser menu, then Install app."); return;
+    default: if (window.RL && RL.A[a]) { await RL.A[a](i, j, el); return; }
   }
 }
 var deferredInstall = null;
@@ -490,6 +492,8 @@ async function boot() {
   if (ok) { try { await loadMe(); } catch (e) { clearSession(); } }
   S.ready = true; render(); loadFeed(false);
 }
+window.RL = { V: V, A: {}, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
+  current: function () { return cur(); }, replace: function (v, p) { stack.pop(); go(v, p); } };
 boot();
 window.__reloved = { S: S, UI: UI };
 })();

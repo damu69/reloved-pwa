@@ -62,6 +62,12 @@
     restore: function () { return refresh().then(function () { return true; }, function () { return false; }); },
     hasToken: function () { return !!token; },
     onLogout: function (f) { onLogout = f; },
+    blob: async function (path) {
+      if (token && Date.now() > expiresAt - 30000) { try { await refresh(); } catch (e) { } }
+      var res; try { res = await fetch(BASE + path, { headers: token ? { Authorization: "Bearer " + token } : {}, credentials: "include" }); } catch (e) { throw ApiError(0, null); }
+      if (!res.ok) throw ApiError(res.status, null);
+      return res.blob();
+    },
     media: function (productId, imageId, size) { return BASE + "/catalogue/media/products/" + productId + "/" + imageId + "/" + size; },
     base: BASE
   };

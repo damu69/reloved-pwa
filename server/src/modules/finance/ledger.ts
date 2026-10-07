@@ -7,13 +7,14 @@ export const PLATFORM = {
   commission: "platform:commission_revenue",
   buyerFee: "platform:buyer_fee_revenue",
   coupons: "platform:coupon_expense",
+  refundsPayable: "platform:refunds_payable",
 } as const;
 
 export type SellerPurpose = "pending" | "available";
 export const sellerAccount = (sellerId: string, purpose: SellerPurpose) => `seller:${sellerId}:${purpose}`;
 
 export interface PostingLine { account: string; direction: "debit" | "credit"; amountPaise: number }
-export interface Posting { kind: "order_payment" | "hold_release"; referenceType: string; referenceId: string; memo: string; lines: PostingLine[] }
+export interface Posting { kind: "order_payment" | "hold_release" | "unapplied_payment"; referenceType: string; referenceId: string; memo: string; lines: PostingLine[] }
 
 async function ensureSellerAccounts(tx: Tx, sellerIds: string[]) {
   if (!sellerIds.length) return;

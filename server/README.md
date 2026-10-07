@@ -17,8 +17,9 @@ it module by module.
 | 7 | Cart, pricing engine, coupons, wishlist, admin fee settings | Done |
 | 8 | Addresses, idempotent checkout, multi-seller orders with frozen amounts, payment confirmation path, unpaid-order expiry, fulfilment steps | Done |
 | 9 | Commission rules (product > seller > category > default), commission frozen per order line, append-only double-entry ledger, seller balances with a 14-day hold | Done |
-| 10 | Payments: provider interface with a MOCK provider, Razorpay later | Next |
-| 11+ | Refunds and cancellations, notifications, payouts, dashboards | Planned |
+| 10 | Payments: provider interface, MOCK provider, payment attempts, signed webhooks processed once, server-side checks of amount and capture, money that cannot be applied kept for refund | Done |
+| 11 | Refunds, returns and cancelling paid orders | Next |
+| 12+ | Razorpay adapter, notifications, payouts, dashboards | Planned |
 
 The existing PWA at the repo root still talks to Supabase directly. It moves to this API
 module by module; nothing in the live app changes yet.
@@ -36,7 +37,9 @@ module by module; nothing in the live app changes yet.
 | Photos are served by the API with a 1-hour cache | `catalogue/routes.ts` | A CDN in front of storage |
 | Files of removed photos and documents stay in storage | `catalogue/products.ts`, `sellers/service.ts` | A cleanup job |
 | GST rates seeded as 0, 3, 5, 18, 40% | `migrations/0003_catalogue.sql` | Confirm with the accountant; admins can add or disable rates |
-| No real payment yet: orders wait for the payment window and are then cancelled; `confirmPayment` is called only by tests until step 10 | `orders/service.ts` | Razorpay (step 10) |
+| Only a MOCK payment provider exists (`PAYMENT_PROVIDER=mock`, refused in production; production defaults to `none`, where orders cannot be paid) | `payments/provider.ts` | Razorpay adapter: create order, checkout signature, server-side payment fetch, webhook signature |
+| Payments marked `needs_refund` are only listed for admins; nothing is refunded automatically | `payments/service.ts` | Refunds (step 11) |
+| GST on commission and fees: on hold by the owner's decision (2026-10-07) | `finance/service.ts` | Decide with the accountant |
 | Paid orders and packages cannot be cancelled yet | `orders/service.ts` | Refunds and cancellations (step 11) |
 | Outbox events are written but not yet delivered | `outbox_events` | Notifications (step 12) |
 | Payouts to sellers' bank accounts are not built; `paidOutPaise` is always 0 | `finance/ledger.ts` | Payouts module |
@@ -87,7 +90,10 @@ limits, strict fulfilment steps, two sellers shipping at once, and seller/custom
 finance: rule precedence and rounding, rules frozen on orders, overlapping and self-serving rules
 refused, gap-free default changes, balanced and append-only ledger postings, coupon cost on the
 platform, the 14-day hold and its release (once, even when run twice at once), and checkout
-stopping when no commission rule is in force.
+stopping when no commission rule is in force; and payments: signatures (browser and webhook, raw
+bytes), server-side amount and capture checks, events processed once, retries after failure, late,
+short, foreign-currency and duplicate payments kept for refund, the payment window, the browser and
+the webhook arriving together, and mock payments refused in production.
 
 All money in the API is integer paise in Indian rupees (INR); prices include GST.
 CI runs them on every push that touches `server/`. To turn CI on, move `server/ci/server-ci.yml` to

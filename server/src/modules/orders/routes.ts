@@ -106,9 +106,9 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
     const res = await orders.checkout(app.db, uid(req), { ...b, idempotencyKey: key }, app.cfg.PAYMENT_WINDOW_MINUTES);
     return reply.code(res.replayed ? 200 : 201).send({
       ...(await orders.orderDetail(app.db, res.orderId, { userId: uid(req) })),
-      // MOCK / TEMPORARY: real payment (Razorpay) arrives in step 10. Until then the order waits for
-      // the payment window and is then cancelled automatically.
-      payment: { provider: "not_connected_yet" },
+      // Next step for the buyer: POST /orders/:id/pay. With no provider configured the order waits
+      // for the payment window and is then cancelled automatically.
+      payment: app.cfg.PAYMENT_PROVIDER === "none" ? { provider: "none", available: false } : { provider: app.cfg.PAYMENT_PROVIDER, available: true },
     });
   });
 

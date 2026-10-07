@@ -26,6 +26,7 @@ export async function setup(): Promise<{ app: FastifyInstance; pool: pg.Pool; cf
     DATA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64"),
     STORAGE_DRIVER: "local",
     STORAGE_LOCAL_DIR: `/tmp/reloved-test-storage/${name}`,
+    PAYMENT_PROVIDER: "mock",
   } as any);
   const pool = new pg.Pool({ connectionString: cfg.DATABASE_URL, max: 20 });
   pool.on("error", () => {}); // connections are force-closed when the test database is dropped

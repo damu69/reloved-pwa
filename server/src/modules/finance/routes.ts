@@ -188,7 +188,7 @@ export async function adminFinanceRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/transactions", { preHandler: read }, async (req) => {
-    const q = parse(pageQuery.extend({ referenceId: uuid().optional(), kind: z.enum(["order_payment", "hold_release"]).optional() }), req.query);
+    const q = parse(pageQuery.extend({ referenceId: uuid().optional(), kind: z.enum(["order_payment", "hold_release", "unapplied_payment"]).optional() }), req.query);
     const c = decodeCursor(q.cursor);
     const r = await app.db.query(
       `select t.*, ${cursorTime("t.created_at")},

@@ -37,9 +37,15 @@ const schema = z.object({
   // MOCK / TEMPORARY: returns the password-reset token in the API response because no email
   // provider exists yet. Must be false in production; startup refuses otherwise.
   DEV_EXPOSE_RESET_TOKEN: z.enum(["true", "false"]).default("false"),
+  // Payment provider. none (default): checkout works but orders cannot be paid (they expire).
+  // mock: a fake provider for development and tests, only when set explicitly; refused in production,
+  // because anyone signed in could mark their own orders paid. Razorpay arrives later.
+  PAYMENT_PROVIDER: z.enum(["none", "mock"]).default("none"),
+  // MOCK / TEMPORARY: signs the mock provider's events. Required with PAYMENT_PROVIDER=mock outside tests.
+  MOCK_PAYMENT_SECRET: z.string().min(32).optional(),
 });
 
-export type Config = z.infer<typeof schema> & { corsOrigins: string[] };
+export type Config = Omit<z.infer<typeof schema>, "MOCK_PAYMENT_SECRET"> & { corsOrigins: string[]; MOCK_PAYMENT_SECRET: string };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = schema.safeParse(env);
@@ -55,9 +61,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (c.DATABASE_SSL === "off") throw new Error("DATABASE_SSL must be require or verify-full in production");
     if (c.STORAGE_DRIVER !== "supabase") throw new Error("STORAGE_DRIVER must be supabase in production (local disk is lost on redeploy)");
     if (/localhost|127\.0\.0\.1|http:\/\//.test(c.CORS_ORIGINS)) throw new Error("CORS_ORIGINS must list only https production origins");
+    if (c.PAYMENT_PROVIDER === "mock") throw new Error("PAYMENT_PROVIDER=mock is not allowed in production: fake payments would mark real orders paid");
   }
   if (c.STORAGE_DRIVER === "supabase" && (!c.SUPABASE_URL || !c.SUPABASE_SERVICE_ROLE_KEY)) {
     throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required when STORAGE_DRIVER=supabase");
   }
-  return { ...c, corsOrigins: c.CORS_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean) };
+  let MOCK_PAYMENT_SECRET = c.MOCK_PAYMENT_SECRET ?? "";
+  if (c.PAYMENT_PROVIDER === "mock" && !MOCK_PAYMENT_SECRET) {
+    if (c.NODE_ENV !== "test") throw new Error("MOCK_PAYMENT_SECRET (32+ random characters) is required with PAYMENT_PROVIDER=mock");
+    MOCK_PAYMENT_SECRET = "mock-payment-secret-used-only-by-automated-tests";
+  }
+  return { ...c, MOCK_PAYMENT_SECRET, corsOrigins: c.CORS_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean) };
 }

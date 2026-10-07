@@ -297,6 +297,32 @@ Refunds (step 11): the seller's earning is reversed; the commission is not, and 
 Seller and admin order views also show each package's `earnings` and each line's commission; buyers
 never see commission.
 
+## Payments (signed-in buyers)
+
+Only a MOCK provider exists for now; Razorpay plugs into the same flow later. The amount is always
+the order total from the database. An order becomes paid only after the server has checked the
+provider's signature and asked the provider (server to server) that the payment was captured and
+for how much.
+
+| Method and path | Notes |
+| --- | --- |
+| `POST /orders/:id/pay` | Starts (or resumes) paying an unpaid order. Returns `{ paymentId, provider, providerOrderId, amountPaise, currency, expiresAt, reused, clientData? }`. 409 `ALREADY_PAID`, `ORDER_NOT_PAYABLE` (cancelled), `PAYMENT_WINDOW_ENDED`; 503 `PAYMENTS_NOT_AVAILABLE` when no provider is configured |
+| `POST /payments/verify` | `{ providerOrderId, providerPaymentId, signature }` from the provider's checkout. Returns `{ outcome, order }`. Outcomes: `captured`, `already_captured`, `needs_refund`, `already_recorded`, `discrepancy`. 400 `INVALID_SIGNATURE`; 409 `PAYMENT_NOT_CAPTURED` (the webhook will finish it) |
+| `POST /payments/mock/simulate` | MOCK only. `{ paymentId, outcome: success\|failure, sendWebhook?, amountPaise? }`: plays the provider's checkout and returns what the browser would receive |
+| `POST /payments/webhook/:provider` | No sign-in. Signature over the raw body is required; each provider event id is processed once (`duplicate` after that). Events with a bad signature are never stored |
+
+Money that arrives but cannot be applied (order cancelled first, already paid by another payment,
+wrong amount, another currency, a second payment, or the order can no longer take it) is kept as a
+payment with status `needs_refund`, booked in the ledger as owed back to the buyer, and listed for
+admins. Order details show the buyer their payment attempts; sellers never see them.
+
+## Payments (admin)
+
+| Method and path | Permission | Notes |
+| --- | --- | --- |
+| `GET /admin/payments?status&orderId&limit&cursor` | `admin.payments.read` | `status=needs_refund` lists money to give back |
+| `GET /admin/payments/:id` | `admin.payments.read` | With the provider events received for it |
+
 ## Health
 
 `GET /health` (process alive) and `GET /ready` (database reachable, 503 if not).

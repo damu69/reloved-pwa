@@ -332,6 +332,9 @@ export async function orderDetail(db: Queryable, orderId: string, scope: { userI
   const events = (await db.query(
     `select e.* from seller_order_events e join seller_orders so on so.id = e.seller_order_id where so.order_id = $1 order by e.id`, [orderId])).rows;
   const sellerView = !!scope.sellerId;
+  const pays = sellerView ? [] : (await db.query(
+    `select id, provider, status, amount_paise, received_paise, failure_reason, refund_reason, captured_at, created_at
+       from payments where order_id = $1 order by created_at, id`, [orderId])).rows;
   return {
     // A seller sees their own package status only, not how other sellers' packages are progressing.
     id: o.id, number: o.number, status: sellerView ? undefined : o.status, paymentStatus: o.payment_status, currency: CURRENCY,
@@ -345,6 +348,12 @@ export async function orderDetail(db: Queryable, orderId: string, scope: { userI
     shippingAddress: sellerView && o.payment_status !== "paid" ? null : o.shipping_address,
     placedAt: o.placed_at, paidAt: o.paid_at, expiresAt: o.status === "pending_payment" ? o.expires_at : undefined,
     cancelledAt: o.cancelled_at, cancelReason: o.cancel_reason,
+    // Payment attempts; sellers do not see them.
+    payments: sellerView ? undefined : pays.map((p) => ({
+      id: p.id, provider: p.provider, status: p.status, amountPaise: Number(p.amount_paise),
+      receivedPaise: p.received_paise === null ? null : Number(p.received_paise),
+      failureReason: p.failure_reason, refundReason: p.refund_reason, capturedAt: p.captured_at, createdAt: p.created_at,
+    })),
     packages: sos.map((so) => ({
       id: so.id, number: so.number, sellerId: so.seller_id, sellerName: so.display_name, status: so.status,
       delivery: { code: so.delivery_code, label: so.delivery_label, feePaise: Number(so.delivery_paise) },

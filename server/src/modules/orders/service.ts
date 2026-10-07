@@ -236,8 +236,7 @@ export async function cancelByCustomer(db: Db, userId: string, orderId: string):
     if (!o) throw Errors.notFound("Order");
     if (o.status === "cancelled") return;
     if (o.status !== "pending_payment") {
-      // MOCK / TEMPORARY limit: cancelling a PAID order needs a refund, which arrives in step 11.
-      throw Errors.invalidTransition("This order is already paid. Cancelling paid orders is not available yet; please contact support.");
+      throw Errors.invalidTransition("This order is already paid; it is cancelled with a refund instead.");
     }
     await cancelUnpaidLocked(tx, o, { userId, role: "customer" }, "Cancelled by the customer before payment");
   });
@@ -288,8 +287,8 @@ export async function moveSellerOrder(
       `select * from seller_orders where id = $1 and ($2::uuid is null or seller_id = $2) for update`, [sellerOrderId, onlySellerId])).rows[0];
     if (!so) throw Errors.notFound("Order");
     if (input.to === "cancelled") {
-      // MOCK / TEMPORARY limit: cancelling a paid package needs a refund (step 11).
-      throw Errors.invalidTransition("Cancelling a paid package is not available yet; it arrives together with refunds.");
+      // Cancelling moves money (refund, stock, earnings), so it has its own endpoint.
+      throw Errors.invalidTransition("Use the cancel endpoint for this package; it refunds the buyer.");
     }
     let allowed = NEXT[so.status] ?? [];
     // Meet-and-collect: handed over in person, so it can go straight to delivered.

@@ -17,6 +17,7 @@ import { createStorage, type Storage } from "./lib/storage.js";
 import { PostgresSearch, type SearchService } from "./modules/search/service.js";
 import { adminInventoryRoutes, sellerInventoryRoutes } from "./modules/inventory/routes.js";
 import { adminCouponRoutes, adminPricingRoutes, cartRoutes, wishlistRoutes } from "./modules/cart/routes.js";
+import { adminReturnRoutes, buyerReturnRoutes, sellerReturnRoutes } from "./modules/returns/routes.js";
 import { adminPaymentRoutes, paymentRoutes, paymentWebhookRoutes } from "./modules/payments/routes.js";
 import { adminCommissionRoutes, adminFinanceRoutes, sellerFinanceRoutes } from "./modules/finance/routes.js";
 import { addressRoutes, adminOrderRoutes, orderRoutes, sellerOrderRoutes } from "./modules/orders/routes.js";
@@ -149,6 +150,9 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
     await v1.register(paymentRoutes);
     await v1.register(paymentWebhookRoutes, { prefix: "/payments/webhook" });
     await v1.register(adminPaymentRoutes, { prefix: "/admin/payments" });
+    await v1.register(buyerReturnRoutes);
+    await v1.register(sellerReturnRoutes, { prefix: "/seller" });
+    await v1.register(adminReturnRoutes, { prefix: "/admin" });
   }, { prefix: "/api/v1" });
 
   return app;

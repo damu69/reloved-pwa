@@ -18,8 +18,9 @@ it module by module.
 | 8 | Addresses, idempotent checkout, multi-seller orders with frozen amounts, payment confirmation path, unpaid-order expiry, fulfilment steps | Done |
 | 9 | Commission rules (product > seller > category > default), commission frozen per order line, append-only double-entry ledger, seller balances with a 14-day hold | Done |
 | 10 | Payments: provider interface, MOCK provider, payment attempts, signed webhooks processed once, server-side checks of amount and capture, money that cannot be applied kept for refund | Done |
-| 11 | Refunds, returns and cancelling paid orders | Next |
-| 12+ | Razorpay adapter, notifications, payouts, dashboards | Planned |
+| 11 | Cancelling paid packages before shipping, returns (damaged or fake, 7 days, photos, seller decision, admin escalation, deadlines), refunds through the provider with retries, refund bookings in the ledger | Done |
+| 12 | Notifications (delivering outbox events by email/SMS/push) | Next |
+| 13+ | Razorpay adapter, seller payouts, dashboards | Planned |
 
 The existing PWA at the repo root still talks to Supabase directly. It moves to this API
 module by module; nothing in the live app changes yet.
@@ -38,13 +39,15 @@ module by module; nothing in the live app changes yet.
 | Files of removed photos and documents stay in storage | `catalogue/products.ts`, `sellers/service.ts` | A cleanup job |
 | GST rates seeded as 0, 3, 5, 18, 40% | `migrations/0003_catalogue.sql` | Confirm with the accountant; admins can add or disable rates |
 | Only a MOCK payment provider exists (`PAYMENT_PROVIDER=mock`, refused in production; production defaults to `none`, where orders cannot be paid) | `payments/provider.ts` | Razorpay adapter: create order, checkout signature, server-side payment fetch, webhook signature |
-| Payments marked `needs_refund` are only listed for admins; nothing is refunded automatically | `payments/service.ts` | Refunds (step 11) |
+| Payments marked `needs_refund` are refunded only when an admin asks (`POST /admin/payments/:id/refund`) | `refunds/service.ts` | Confirm whether these should be refunded automatically |
 | GST on commission and fees: on hold by the owner's decision (2026-10-07) | `finance/service.ts` | Decide with the accountant |
 | Paid orders and packages cannot be cancelled yet | `orders/service.ts` | Refunds and cancellations (step 11) |
 | Outbox events are written but not yet delivered | `outbox_events` | Notifications (step 12) |
 | Payouts to sellers' bank accounts are not built; `paidOutPaise` is always 0 | `finance/ledger.ts` | Payouts module |
 | No GST on commission or on the Buyer Protection fee; no GST TCS (section 52) or income-tax TDS (194-O) withheld from sellers | `finance/service.ts` | Confirm with the accountant before launch |
-| Earnings are released 14 days after payment even if the package has not shipped or has an open complaint | `finance/service.ts` | Hold on open returns and disputes (step 11) |
+| Earnings are released 14 days after payment even if the package has not shipped (open returns do block it) | `finance/service.ts` | Owner's decision; revisit if sellers abuse it |
+| A seller's available balance can go negative after a refund; payouts must net it | `finance/ledger.ts` | Payouts module |
+| Return deadlines and refund retries run on the 60-second timer in the API process | `server.ts` | Job queue (Redis + BullMQ) |
 | Required KYC documents are a default (PAN card, address proof, bank proof, GST certificate if GSTIN given) | `sellers/rules.ts` | Confirm with the business / accountant |
 
 ## Run locally

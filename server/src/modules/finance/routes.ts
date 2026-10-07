@@ -157,11 +157,28 @@ export async function adminFinanceRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/settings", { preHandler: read }, async () => finance.settings(app.db));
 
+  // Changes apply to orders paid and returns requested from now on.
   app.patch("/settings", { preHandler: manage }, async (req) => {
-    const b = parse(z.object({ payoutHoldDays: z.number().int().min(0).max(90), reason: safeText(3, 300) }).strict(), req.body);
+    const b = parse(z.object({
+      payoutHoldDays: z.number().int().min(0).max(90).optional(),
+      returnWindowDays: z.number().int().min(1).max(30).optional(),
+      sellerDecisionDays: z.number().int().min(1).max(14).optional(),
+      escalationDays: z.number().int().min(1).max(14).optional(),
+      returnShipDays: z.number().int().min(1).max(30).optional(),
+      returnReceiptDays: z.number().int().min(1).max(30).optional(),
+      returnShippingPaise: z.number().int().min(0).max(100_000).optional(),
+      reason: safeText(3, 300),
+    }).strict().refine((v) => Object.keys(v).length > 1, "Nothing to update"), req.body);
     await withTx(app.db, async (tx) => {
-      const old = (await tx.query(`select payout_hold_days from finance_settings where id = 1 for update`)).rows[0];
-      await tx.query(`update finance_settings set payout_hold_days = $1, updated_by = $2, updated_at = now() where id = 1`, [b.payoutHoldDays, req.auth!.userId]);
+      await tx.query(`select id from finance_settings where id = 1 for update`);
+      const old = await finance.settings(tx);
+      await tx.query(
+        `update finance_settings set payout_hold_days = coalesce($1, payout_hold_days), return_window_days = coalesce($2, return_window_days),
+                seller_decision_days = coalesce($3, seller_decision_days), escalation_days = coalesce($4, escalation_days),
+                return_ship_days = coalesce($5, return_ship_days), return_receipt_days = coalesce($6, return_receipt_days),
+                return_shipping_paise = coalesce($7, return_shipping_paise), updated_by = $8, updated_at = now() where id = 1`,
+        [b.payoutHoldDays ?? null, b.returnWindowDays ?? null, b.sellerDecisionDays ?? null, b.escalationDays ?? null,
+         b.returnShipDays ?? null, b.returnReceiptDays ?? null, b.returnShippingPaise ?? null, req.auth!.userId]);
       await writeAudit(tx, { ...ctxOf(req), action: "finance.settings_update", entity: "finance_settings", entityId: "1", oldValue: old, newValue: b });
     });
     return finance.settings(app.db);
@@ -188,7 +205,7 @@ export async function adminFinanceRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/transactions", { preHandler: read }, async (req) => {
-    const q = parse(pageQuery.extend({ referenceId: uuid().optional(), kind: z.enum(["order_payment", "hold_release", "unapplied_payment"]).optional() }), req.query);
+    const q = parse(pageQuery.extend({ referenceId: uuid().optional(), kind: z.enum(["order_payment", "hold_release", "unapplied_payment", "refund_due", "refund_paid"]).optional() }), req.query);
     const c = decodeCursor(q.cursor);
     const r = await app.db.query(
       `select t.*, ${cursorTime("t.created_at")},

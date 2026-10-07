@@ -4,6 +4,9 @@ import { buildApp } from "./app.js";
 import { expireDue, processSearchQueue } from "./modules/inventory/service.js";
 import { expireUnpaidOrders } from "./modules/orders/service.js";
 import { releaseHeldFunds } from "./modules/finance/service.js";
+import { processDeadlines } from "./modules/returns/service.js";
+import { processPendingRefunds, processRefund } from "./modules/refunds/service.js";
+import { providerFor } from "./modules/payments/provider.js";
 
 const cfg = loadConfig();
 const db = createPool(cfg);
@@ -34,6 +37,16 @@ const sweep = setInterval(() => {
     .then(() => expireDue(db))
     .then((n) => { if (n) app.log.info({ released: n }, "expired stock reservations"); })
     .catch((err) => app.log.error({ err }, "reservation sweep failed"))
+    .then(() => processDeadlines(db))
+    .then(async (r) => {
+      for (const id of r.refunds) await processRefund(db, providerFor(cfg), id);
+      if (r.changed) app.log.info({ changed: r.changed }, "return deadlines processed");
+      for (const f of r.failed) app.log.error({ returnId: f.id, error: f.error }, "return deadline could not be processed");
+    })
+    .catch((err) => app.log.error({ err }, "return deadline sweep failed"))
+    .then(() => processPendingRefunds(db, providerFor(cfg)))
+    .then((n) => { if (n) app.log.info({ processed: n }, "pending refunds sent"); })
+    .catch((err) => app.log.error({ err }, "refund retry sweep failed"))
     .then(() => releaseHeldFunds(db))
     .then((n) => { if (n) app.log.info({ released: n }, "seller earnings moved from on hold to available"); })
     .catch((err) => app.log.error({ err }, "earnings release sweep failed"))

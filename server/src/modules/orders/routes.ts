@@ -10,6 +10,8 @@ import { windowLimiter } from "../../lib/limiter.js";
 import { authenticate, requirePermission } from "../auth/guard.js";
 import { requireApprovedSeller } from "../sellers/guard.js";
 import * as orders from "./service.js";
+import * as refunds from "../refunds/service.js";
+import { providerFor } from "../payments/provider.js";
 
 const idParam = z.object({ id: uuid() });
 
@@ -130,9 +132,19 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/orders/:id", async (req) => orders.orderDetail(app.db, parse(idParam, req.params).id, { userId: uid(req) }));
 
+  // Before payment: the order is simply cancelled. After payment: every package is cancelled and
+  // refunded, as long as none has shipped.
   app.post("/orders/:id/cancel", async (req) => {
     const { id } = parse(idParam, req.params);
-    await orders.cancelByCustomer(app.db, uid(req), id);
+    const b = parse(z.object({ reason: safeText(3, 300).optional() }).strict(), req.body ?? {});
+    const o = (await app.db.query(`select payment_status from orders where id = $1 and user_id = $2`, [id, uid(req)])).rows[0];
+    if (!o) throw Errors.notFound("Order");
+    if (o.payment_status === "unpaid") await orders.cancelByCustomer(app.db, uid(req), id);
+    else {
+      const ids = await withTx(app.db, (tx) => refunds.cancelPaidOrder(tx, uid(req), id, b.reason ?? "Cancelled by the customer"));
+      const provider = providerFor(app.cfg);
+      for (const rid of ids) await refunds.processRefund(app.db, provider, rid);
+    }
     return orders.orderDetail(app.db, id, { userId: uid(req) });
   });
 }

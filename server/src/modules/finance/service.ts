@@ -2,9 +2,17 @@ import type { Db, Queryable, Tx } from "../../lib/db.js";
 import { withTx } from "../../lib/db.js";
 import { PLATFORM, post, sellerAccount } from "./ledger.js";
 
-export async function settings(db: Queryable): Promise<{ payoutHoldDays: number }> {
-  const r = (await db.query(`select payout_hold_days from finance_settings where id = 1`)).rows[0];
-  return { payoutHoldDays: r.payout_hold_days };
+export interface FinanceSettings {
+  payoutHoldDays: number; returnWindowDays: number; sellerDecisionDays: number; escalationDays: number;
+  returnShipDays: number; returnReceiptDays: number; returnShippingPaise: number;
+}
+export async function settings(db: Queryable): Promise<FinanceSettings> {
+  const r = (await db.query(`select * from finance_settings where id = 1`)).rows[0];
+  return {
+    payoutHoldDays: r.payout_hold_days, returnWindowDays: r.return_window_days, sellerDecisionDays: r.seller_decision_days,
+    escalationDays: r.escalation_days, returnShipDays: r.return_ship_days, returnReceiptDays: r.return_receipt_days,
+    returnShippingPaise: Number(r.return_shipping_paise),
+  };
 }
 
 // Called by payment confirmation, inside its transaction, with the order row already locked.
@@ -44,31 +52,42 @@ export async function postOrderPayment(tx: Tx, order: any): Promise<void> {
 // per transaction; SKIP LOCKED lets several instances run it; the ledger's unique key makes a
 // repeat harmless.
 //
-// TODO step 11: packages with an open return or dispute, or cancelled after payment, must not be released.
+// Packages with a return still open are skipped until it is settled. Only what is still on hold is
+// moved: an earlier refund may already have taken part of the earning back.
+export const OPEN_RETURN = ["requested", "approved", "rejected", "disputed", "shipped_back", "received"];
 export async function releaseHeldFunds(db: Db, max = 500): Promise<number> {
   let n = 0;
+  const skip: string[] = [];
   while (n < max) {
     const done = await withTx(db, async (tx) => {
       const so = (await tx.query(
         `select id, seller_id, number, seller_earning_paise from seller_orders
-          where funds_available_at <= now() and funds_released_at is null and status <> 'cancelled'
-          order by funds_available_at limit 1 for update skip locked`)).rows[0];
+          where funds_available_at <= now() and funds_released_at is null and status <> 'cancelled' and not (id = any($1::uuid[]))
+          order by funds_available_at limit 1 for update skip locked`, [skip])).rows[0];
       if (!so) return false;
-      const amount = Number(so.seller_earning_paise);
-      if (amount > 0) {
+      // Checked again after the lock, with a fresh view: a return opened a moment ago must block this.
+      const open = await tx.query(`select 1 from returns where seller_order_id = $1 and status = any($2::text[]) limit 1`, [so.id, OPEN_RETURN]);
+      if (open.rowCount) { skip.push(so.id); return true; }
+      const taken = (await tx.query(
+        `select coalesce(sum(seller_debit_paise), 0)::bigint s from refunds where seller_order_id = $1 and seller_account = 'pending'`, [so.id])).rows[0].s;
+      const amount = Number(so.seller_earning_paise) - Number(taken);
+      // Negative when a refund took back more than was on hold (for example the return shipping
+      // charged on a meet-and-collect sale): the difference then comes out of the available balance.
+      if (amount !== 0) {
+        const [from, to] = amount > 0 ? ["pending", "available"] as const : ["available", "pending"] as const;
         await post(tx, {
           kind: "hold_release", referenceType: "seller_order", referenceId: so.id, memo: `Hold ended for package ${so.number}`,
           lines: [
-            { account: sellerAccount(so.seller_id, "pending"), direction: "debit", amountPaise: amount },
-            { account: sellerAccount(so.seller_id, "available"), direction: "credit", amountPaise: amount },
+            { account: sellerAccount(so.seller_id, from), direction: "debit", amountPaise: Math.abs(amount) },
+            { account: sellerAccount(so.seller_id, to), direction: "credit", amountPaise: Math.abs(amount) },
           ],
         });
       }
       await tx.query(`update seller_orders set funds_released_at = now() where id = $1`, [so.id]);
+      n++;
       return true;
     });
     if (!done) break;
-    n++;
   }
   return n;
 }

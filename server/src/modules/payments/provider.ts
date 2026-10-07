@@ -38,6 +38,9 @@ export interface PaymentProvider {
   // Asks the provider, server to server, what really happened to a payment. A browser signature
   // proves the buyer went through checkout, not that the money was captured or how much it was.
   fetchPayment(providerPaymentId: string): Promise<FetchedPayment | null>;
+  // Sends money back. The idempotency key (our refund id) makes a retry return the same refund
+  // instead of paying twice. Throws if the provider refuses.
+  refund(input: { providerPaymentId: string; amountPaise: number; idempotencyKey: string }): Promise<{ providerRefundId: string }>;
   verifyWebhook(rawBody: Buffer, headers: Record<string, string | string[] | undefined>): boolean;
   // Only called after verifyWebhook. Throws on a body it cannot read.
   parseWebhook(rawBody: Buffer, headers: Record<string, string | string[] | undefined>): ProviderEvent;
@@ -63,6 +66,27 @@ export class MockProvider implements PaymentProvider {
 
   async fetchPayment(providerPaymentId: string): Promise<FetchedPayment | null> {
     return MockProvider.gateway.get(providerPaymentId) ?? null;
+  }
+
+  private static readonly refunds = new Map<string, { providerRefundId: string; providerPaymentId: string; amountPaise: number }>();
+  // Set by tests to make the next refunds fail, like a provider outage.
+  static failRefunds = 0;
+
+  async refund(i: { providerPaymentId: string; amountPaise: number; idempotencyKey: string }) {
+    const done = MockProvider.refunds.get(i.idempotencyKey);
+    if (done) return { providerRefundId: done.providerRefundId };
+    if (MockProvider.failRefunds > 0) { MockProvider.failRefunds--; throw new Error("Mock provider is unavailable"); }
+    const p = MockProvider.gateway.get(i.providerPaymentId);
+    if (!p || p.status !== "captured") throw new Error("Payment not found or not captured");
+    const already = [...MockProvider.refunds.values()].filter((r) => r.providerPaymentId === i.providerPaymentId).reduce((a, r) => a + r.amountPaise, 0);
+    if (already + i.amountPaise > p.amountPaise) throw new Error("Refund exceeds the payment");
+    const providerRefundId = `rfnd_mock_${randomBytes(9).toString("hex")}`;
+    MockProvider.refunds.set(i.idempotencyKey, { providerRefundId, providerPaymentId: i.providerPaymentId, amountPaise: i.amountPaise });
+    return { providerRefundId };
+  }
+
+  static refundedFor(providerPaymentId: string) {
+    return [...MockProvider.refunds.values()].filter((r) => r.providerPaymentId === providerPaymentId).reduce((a, r) => a + r.amountPaise, 0);
   }
 
   async createOrder(input: { amountPaise: number; currency: "INR"; receipt: string }) {

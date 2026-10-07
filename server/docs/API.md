@@ -323,6 +323,63 @@ admins. Order details show the buyer their payment attempts; sellers never see t
 | `GET /admin/payments?status&orderId&limit&cursor` | `admin.payments.read` | `status=needs_refund` lists money to give back |
 | `GET /admin/payments/:id` | `admin.payments.read` | With the provider events received for it |
 
+## Cancelling paid orders
+
+The buyer can cancel a paid package until it ships, and gets back the items (what they paid after any
+coupon), the package's delivery fee and its share of Buyer Protection (shares follow item value and
+add up to the whole fee). Stock goes back on sale. The seller's earning for the package is reversed;
+commission is not given back to the seller (the platform bears it). A coupon use is not given back.
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `POST /orders/:id/cancel` | Buyer | `{ reason? }`. Unpaid: cancels the order. Paid: cancels and refunds every package, only if none has shipped (422 `PARTLY_SHIPPED` with the ids still cancellable) |
+| `POST /orders/:id/packages/:packageId/cancel` | Buyer | `{ reason? }`. One package; 422 `ALREADY_SHIPPED` once shipped |
+| `POST /seller/orders/:id/cancel` | Seller | `{ reason, restock }`. `restock: false` when the item no longer exists (lost, sold elsewhere) |
+| `POST /admin/seller-orders/:id/cancel` | `admin.returns.manage` | `{ reason, restock }`. Audited; not on orders you are part of |
+
+## Returns
+
+Within 7 days of delivery, only for an item that arrived damaged or is fake (no size returns: it is
+thrift). At least one photo. The seller has 3 days to accept or reject (no answer = accepted). A
+rejected buyer has 3 days to ask an admin, whose decision is final. Once accepted the buyer has 7 days
+to ship the item back and add tracking; the seller then has 7 days to confirm receipt (otherwise it is
+treated as received, not resellable). Refund: the items, their Buyer Protection share and the return
+shipping (₹99, charged to the seller); the original delivery fee is not refunded. A package is never
+refunded more than was paid for it, so the return shipping is capped (₹59 for pickup, ₹0 for
+meet-and-collect). An item can be returned once; only a return withdrawn before any decision frees it.
+The seller's earnings for the package stay on hold while a return is open.
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `POST /me/return-photos` | Buyer | multipart, one JPEG/PNG/WebP up to 8 MB, at least 300 px. Returns `{ id }` |
+| `POST /returns` | Buyer | `{ packageId, orderItemIds, reason: damaged\|fake, description, photoIds (1–5) }`. 422 `RETURN_WINDOW_ENDED`; 409 `RETURN_EXISTS` |
+| `GET /returns`, `GET /returns/:id`, `GET /returns/:id/photos/:photoId` | Buyer | Status, deadlines, history, refund |
+| `POST /returns/:id/escalate` | Buyer | `{ note }`, after a rejection, before `escalateBy` |
+| `POST /returns/:id/ship` | Buyer | `{ carrier, trackingNumber }`, before `shipBy` |
+| `POST /returns/:id/withdraw` | Buyer | Until shipped back |
+| `GET /seller/returns`, `GET /seller/returns/:id`, `.../photos/:photoId` | Seller | Own packages only (suspended sellers too) |
+| `POST /seller/returns/:id/accept`, `POST /seller/returns/:id/reject` | Seller | Reject needs `{ reason }`; both only before `sellerDecideBy` (422 `DEADLINE_PASSED`) |
+| `POST /seller/returns/:id/received` | Seller | `{ condition: good\|damaged }`. Good goes to returned stock (restock it from inventory); the refund is sent |
+| `GET /admin/returns`, `GET /admin/returns/:id`, `.../photos/:photoId` | `admin.returns.manage` | |
+| `POST /admin/returns/:id/decide` | `admin.returns.manage` | `{ approve, note }` on requested, rejected or disputed returns. Final; audited |
+| `POST /admin/returns/:id/received` | `admin.returns.manage` | `{ condition, note }`. Audited |
+
+## Refunds (admin)
+
+Refunds are sent to the payment provider with the refund id as idempotency key. If the provider
+fails, the refund stays `pending` and is retried with back-off (30 s doubling to 1 hour). The order's
+`paymentStatus` becomes `partially_refunded` or `refunded`.
+
+| Method and path | Permission | Notes |
+| --- | --- | --- |
+| `GET /admin/refunds?status&orderId&limit&cursor` | `admin.refunds.manage` | With the breakdown (items, Buyer Protection, delivery, return shipping) and what was taken back from the seller |
+| `POST /admin/refunds/:id/retry` | `admin.refunds.manage` | Harmless on a processed refund |
+| `POST /admin/payments/:id/refund` | `admin.refunds.manage` | `{ reason }`. Gives back a payment marked `needs_refund` in full; audited; asking twice returns the same refund |
+
+`PATCH /admin/finance/settings` also takes `returnWindowDays`, `sellerDecisionDays`, `escalationDays`,
+`returnShipDays`, `returnReceiptDays` and `returnShippingPaise` (with a `reason`); they apply to returns
+requested from then on.
+
 ## Health
 
 `GET /health` (process alive) and `GET /ready` (database reachable, 503 if not).

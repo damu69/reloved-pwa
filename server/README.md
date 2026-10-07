@@ -13,7 +13,8 @@ it module by module.
 | 3 | Seller applications, KYC documents, bank accounts, admin review | Done |
 | 4 | Catalogue: categories, brands, GST rates, products, variants, photos, review of new products and of edits to live ones | Done |
 | 5 | Search: full text with typo tolerance (English and Indian scripts), filters, sorting, cursor pagination | Done |
-| 6 | Inventory: stock, reservations, no overselling | Next |
+| 6 | Inventory: warehouses, stock counters, checkout holds that expire, no overselling, stock history, availability in search | Done |
+| 7 | Cart and coupons | Next |
 | 4+ | Catalogue, search, inventory, cart, checkout, ledger, payments (MOCK), refunds, notifications, dashboards | Planned |
 
 The existing PWA at the repo root still talks to Supabase directly. It moves to this API
@@ -26,6 +27,8 @@ module by module; nothing in the live app changes yet.
 | Password-reset token returned in the API response | `DEV_EXPOSE_RESET_TOKEN`, `auth/service.ts` | Email via the notification module. The server refuses to start in production with this on. |
 | In-memory rate limits | `app.ts`, `lib/limiter.ts` | Redis store, once more than one API instance runs |
 | Supabase Storage driver not yet run against a live project | `lib/storage.ts` | Verify on staging with a private bucket before go-live |
+| Expiry of unpaid stock holds and leftover search refreshes run on a 60-second timer inside the API process | `server.ts` | Job queue (Redis + BullMQ) |
+| A checkout takes each item from one warehouse (no splitting one item across warehouses) | `inventory/service.ts` | Split reservations if sellers need it |
 | Photos are processed during the upload request | `lib/images.ts` | Background job queue (Redis + BullMQ) when upload volume grows |
 | Photos are served by the API with a 1-hour cache | `catalogue/routes.ts` | A CDN in front of storage |
 | Files of removed photos and documents stay in storage | `catalogue/products.ts`, `sellers/service.ts` | A cleanup job |
@@ -61,7 +64,10 @@ GST rates, SKU and option rules, photo type, size, metadata stripping and caps, 
 submission and review, edits to live products waiting as versioned pending changes, stale approvals,
 instant audited price changes, archive, block, seller suspension and public visibility; and search:
 matching across fields, Hindi text, typos, unsafe input, filters, every sort order paged with ties,
-microsecond timestamps, concurrent edits and suspensions, and 10,000-product timings.
+microsecond timestamps, concurrent edits and suspensions, and 10,000-product timings; and inventory:
+50 buyers for the last unit, 30 buyers for 10 units, crossed-order checkouts without deadlocks,
+expiry sweeps running in parallel, late payments after expiry, stale exact counts, returns and
+restocking, warehouse switches, append-only stock history, and admin adjustments.
 
 All money in the API is integer paise in Indian rupees (INR); prices include GST.
 CI runs them on every push that touches `server/`. To turn CI on, move `server/ci/server-ci.yml` to

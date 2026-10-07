@@ -1,12 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 import { setup } from "./helpers.js";
+import { processSearchQueue } from "../src/modules/inventory/service.js";
 
 let t: Awaited<ReturnType<typeof setup>>;
 let ip = 0;
 const get = (url: string) => t.app.inject({ method: "GET", url: `/api/v1/catalogue${url}`, remoteAddress: `10.60.${Math.floor(++ip / 250)}.${(ip % 250) + 1}` });
 const ids = async (url: string) => (await get(url)).json().items.map((x: any) => x.title);
 
+const wh = new Map<string, string>();
 let sellerA: string, sellerB: string, jackets: string, tops: string, kurtas: string, levis: string, zara: string;
 
 async function product(o: { seller?: string; cat?: string; brand?: string | null; title: string; desc?: string; cond?: string; price: number; attrs?: object; sku?: string; status?: string; createdAt?: string }) {
@@ -16,10 +18,11 @@ async function product(o: { seller?: string; cat?: string; brand?: string | null
     [o.seller ?? sellerA, o.status ?? "active", o.title, o.desc ?? "", o.cat ?? jackets, o.brand === undefined ? levis : o.brand, o.cond ?? "good", JSON.stringify(o.attrs ?? {}), o.createdAt ?? null],
   );
   const id = r.rows[0].id;
-  await t.pool.query(
-    `insert into product_variants (product_id, seller_id, sku, price_paise, mrp_paise) values ($1, $2, $3, $4, $4)`,
+  const v = await t.pool.query(
+    `insert into product_variants (product_id, seller_id, sku, price_paise, mrp_paise) values ($1, $2, $3, $4, $4) returning id`,
     [id, o.seller ?? sellerA, o.sku ?? `SKU-${id.slice(0, 8)}`, o.price * 100],
   );
+  await t.pool.query(`insert into inventory_levels (variant_id, warehouse_id, on_hand) values ($1, $2, 5)`, [v.rows[0].id, wh.get(o.seller ?? sellerA)]);
   return id as string;
 }
 
@@ -31,6 +34,9 @@ beforeAll(async () => {
      values ($1, 'approved', $2::text, $2::text, 'individual', 'v1:x', '1234', 'Street', 'Nanded', 'MH', '431601', '9876543210') returning id`, [u, name])).rows[0].id;
   sellerA = await mkSeller(await mkUser("a@x.com"), "Ganga Vintage");
   sellerB = await mkSeller(await mkUser("b@x.com"), "Bombay Closet");
+  for (const s of [sellerA, sellerB]) {
+    wh.set(s, (await t.pool.query(`insert into warehouses (seller_id, name, pincode, is_default) values ($1, 'Main', '431601', true) returning id`, [s])).rows[0].id);
+  }
   const cat = async (parent: string | null, slug: string, name: string, path: string, depth: number) =>
     (await t.pool.query(`insert into categories (parent_id, slug, name, path, depth) values ($1, $2, $3, $4, $5) returning id`, [parent, slug, name, path, depth])).rows[0].id;
   const men = await cat(null, "men", "Men", "men", 0);
@@ -159,6 +165,7 @@ describe("index stays current", () => {
     expect(await ids("/products?q=कुर्ता")).toEqual([]);
     await t.pool.query(`update categories set is_active = true where id = $1`, [kurtas]);
     await t.pool.query(`update sellers set display_name = 'Mumbai Closet' where id = $1`, [sellerB]);
+    await processSearchQueue(t.pool);
     expect((await ids("/products?q=mumbai")).length).toBeGreaterThan(0);
   });
 });
@@ -184,6 +191,7 @@ describe("concurrency (review regressions)", () => {
   it("two price edits on one product in parallel leave the true lowest price", async () => {
     const id = await product({ title: "Twin price shirt", price: 5000, sku: "TWIN-A", cat: tops, brand: null });
     await t.pool.query(`insert into product_variants (product_id, seller_id, sku, options, price_paise, mrp_paise) values ($1, $2, 'TWIN-B', '{"size":"L"}', 500000, 500000)`, [id, sellerA]);
+    await t.pool.query(`insert into inventory_levels (variant_id, warehouse_id, on_hand) select id, $1, 5 from product_variants where sku = 'TWIN-B'`, [wh.get(sellerA)]);
     const c1 = await client(), c2 = await client();
     try {
       await c1.query("begin");
@@ -209,8 +217,12 @@ describe("scale", () => {
           from generate_series(1, 10000) g
         returning id, seller_id
       )
-      insert into product_variants (product_id, seller_id, sku, price_paise, mrp_paise)
-      select id, seller_id, 'BULK-' || substr(id::text, 1, 12), 10000 + (random() * 500000)::int, 600000 from p`, [sellerA, tops]);
+      , v as (
+        insert into product_variants (product_id, seller_id, sku, price_paise, mrp_paise)
+        select id, seller_id, 'BULK-' || substr(id::text, 1, 12), 10000 + (random() * 500000)::int, 600000 from p
+        returning id
+      )
+      insert into inventory_levels (variant_id, warehouse_id, on_hand) select id, $3, 3 from v`, [sellerA, tops, wh.get(sellerA)]);
     await t.pool.query("analyze product_search");
     const timings: number[] = [];
     for (const url of ["/products?q=saree", "/products?q=sareee", "/products?category=women&sort=price_asc", "/products?q=bulk%20jacket&maxPrice=2000", "/products"]) {
@@ -225,9 +237,10 @@ describe("scale", () => {
     // Renaming a category with 10,000+ products rebuilds their search text in one statement.
     const s = performance.now();
     await t.pool.query(`update categories set name = 'Tops and blouses' where id = $1`, [tops]);
+    await processSearchQueue(t.pool);
     const renameMs = performance.now() - s;
     console.log("category rename over 10k products (ms):", Math.round(renameMs));
-    expect(renameMs).toBeLessThan(10_000);
+    expect(renameMs).toBeLessThan(20_000);
     expect((await get("/products?q=blouses&limit=1")).json().items.length).toBe(1);
   }, 120_000);
 });

@@ -15,6 +15,7 @@ import { adminCatalogueRoutes, publicCatalogueRoutes, sellerCatalogueRoutes } fr
 import { createFieldCipher, type FieldCipher } from "./lib/encryption.js";
 import { createStorage, type Storage } from "./lib/storage.js";
 import { PostgresSearch, type SearchService } from "./modules/search/service.js";
+import { adminInventoryRoutes, sellerInventoryRoutes } from "./modules/inventory/routes.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -96,6 +97,11 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
       const code = err.statusCode === 413 ? "PAYLOAD_TOO_LARGE" : err.statusCode === 415 ? "UNSUPPORTED_MEDIA_TYPE" : "BAD_REQUEST";
       return reply.code(err.statusCode).send({ error: { code, message: "The request could not be read.", requestId } });
     }
+    // Two transactions collided (deadlock or serialization failure). Nothing was saved; retrying works.
+    if (err?.code === "40P01" || err?.code === "40001") {
+      req.log.warn({ err }, "transaction conflict");
+      return reply.code(503).header("retry-after", "1").send({ error: { code: "TRY_AGAIN", message: "Too many people are changing this at once. Please try again.", requestId } });
+    }
     // Postgres invalid input (for example a malformed id in a cursor).
     if (typeof err?.code === "string" && err.code.startsWith("22")) {
       return reply.code(400).send({ error: { code: "VALIDATION_FAILED", message: "Some values are invalid.", requestId } });
@@ -123,6 +129,8 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
     await v1.register(sellerCatalogueRoutes, { prefix: "/seller/products" });
     await v1.register(adminCatalogueRoutes, { prefix: "/admin/catalogue" });
     await v1.register(publicCatalogueRoutes, { prefix: "/catalogue" });
+    await v1.register(sellerInventoryRoutes, { prefix: "/seller/inventory" });
+    await v1.register(adminInventoryRoutes, { prefix: "/admin/inventory" });
   }, { prefix: "/api/v1" });
 
   return app;

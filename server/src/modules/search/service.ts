@@ -13,13 +13,14 @@ export interface SearchParams {
   conditions?: string[] | undefined;
   minPricePaise?: number | undefined;
   maxPricePaise?: number | undefined;
+  includeOutOfStock?: boolean | undefined;   // default: sold-out products are hidden
   sort?: SearchSort | undefined;
   limit: number;
   cursor?: string | undefined;
 }
 export interface SearchHit {
   id: string; title: string; condition: string; brandName: string | null; sellerName: string;
-  categoryPath: string; minPricePaise: number; currency: typeof CURRENCY; coverImageId: string | null;
+  categoryPath: string; minPricePaise: number; currency: typeof CURRENCY; coverImageId: string | null; inStock: boolean;
 }
 export interface SearchResult { items: SearchHit[]; nextCursor: string | null; sort: SearchSort }
 
@@ -82,6 +83,7 @@ export class PostgresSearch implements SearchService {
     if (p.sellerId) where.push(`ps.seller_id = ${arg(p.sellerId)}`);
     if (p.conditions?.length) where.push(`ps.condition = any(${arg(p.conditions)})`);
     if (p.minPricePaise !== undefined) where.push(`ps.min_price_paise >= ${arg(p.minPricePaise)}`);
+    if (!p.includeOutOfStock) where.push("ps.in_stock");
     if (p.maxPricePaise !== undefined) where.push(`ps.min_price_paise <= ${arg(p.maxPricePaise)}`);
 
     const order = {
@@ -96,7 +98,7 @@ export class PostgresSearch implements SearchService {
     const sql = `
       select * from (
         select ps.product_id, ps.title, ps.condition, ps.brand_name, ps.seller_name, ps.category_path,
-               ps.min_price_paise, ps.cover_image_id, ps.created_at,
+               ps.min_price_paise, ps.cover_image_id, ps.created_at, ps.in_stock,
                to_char(ps.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_t, ${rank} as rank
           from product_search ps
           join sellers s on s.id = ps.seller_id
@@ -122,6 +124,7 @@ export class PostgresSearch implements SearchService {
       items: items.map((r: any) => ({
         id: r.product_id, title: r.title, condition: r.condition, brandName: r.brand_name, sellerName: r.seller_name,
         categoryPath: r.category_path, minPricePaise: Number(r.min_price_paise), currency: CURRENCY, coverImageId: r.cover_image_id,
+        inStock: r.in_stock,
       })),
       nextCursor: more && last ? encode(sort, keyOf(last), last.product_id) : null,
     };

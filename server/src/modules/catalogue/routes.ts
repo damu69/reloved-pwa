@@ -10,6 +10,8 @@ import { authenticate, requirePermission } from "../auth/guard.js";
 import { requireApprovedSeller } from "../sellers/guard.js";
 import { createSchema, keyValues, patchSchema, type Content } from "./content.js";
 import * as svc from "./products.js";
+import { availability } from "../inventory/service.js";
+import { refreshSearchSoon } from "../inventory/routes.js";
 
 const ctxOf = (req: FastifyRequest): svc.Ctx => ({ actorUserId: req.auth!.userId, ip: req.ip ?? null, requestId: String(req.id) });
 const productParam = z.object({ id: uuid() });
@@ -205,6 +207,7 @@ export async function adminCatalogueRoutes(app: FastifyInstance): Promise<void> 
       );
       await writeAudit(tx, { ...ctxOf(req), action: "category.update", entity: "category", entityId: id, oldValue: { name: cur.name, sortOrder: cur.sort_order, isActive: cur.is_active }, newValue: b });
     });
+    await refreshSearchSoon(app);
     return { ok: true };
   });
 
@@ -353,6 +356,7 @@ export async function publicCatalogueRoutes(app: FastifyInstance): Promise<void>
       minPrice: rupees,
       maxPrice: rupees,
       sort: z.enum(["relevance", "newest", "price_asc", "price_desc"]).optional(),
+      includeOutOfStock: z.enum(["true", "false"]).optional(),
       limit: z.coerce.number().int().min(1).max(60).default(24),
       cursor: z.string().max(300).optional(),
     }), req.query);
@@ -360,7 +364,7 @@ export async function publicCatalogueRoutes(app: FastifyInstance): Promise<void>
       q: q.q, category: q.category, brands: q.brand, sellerId: q.sellerId, conditions: q.condition,
       minPricePaise: q.minPrice === undefined ? undefined : Math.round(q.minPrice * 100),
       maxPricePaise: q.maxPrice === undefined ? undefined : Math.round(q.maxPrice * 100),
-      sort: q.sort, limit: q.limit, cursor: q.cursor,
+      sort: q.sort, limit: q.limit, cursor: q.cursor, includeOutOfStock: q.includeOutOfStock === "true",
     });
   });
 
@@ -372,12 +376,17 @@ export async function publicCatalogueRoutes(app: FastifyInstance): Promise<void>
     );
     if (!ok.rowCount) throw Errors.notFound("Product");
     const d = await svc.detail(app.db, id, {});
+    const avail = await availability(app.db, d.variants.map((v) => v.id));
     // Public view: live content only. Pending edits, inactive variants and review notes stay private.
     return {
       id: d.id, title: d.title, description: d.description, condition: d.condition, attributes: d.attributes,
       categoryPath: d.categoryPath, categoryName: d.categoryName, brandName: d.brandName, gstRateBp: d.gstRateBp, currency: d.currency,
       seller: { id: d.seller.id, displayName: d.seller.displayName },
-      variants: d.variants.filter((v) => v.isActive).map(({ isActive: _a, ...v }) => v),
+      // Exact stock is not published; buyers see whether a variant can be bought and "only N left" when few remain.
+      variants: d.variants.filter((v) => v.isActive).map(({ isActive: _a, ...v }) => {
+        const n = avail.get(v.id) ?? 0;
+        return { ...v, inStock: n > 0, onlyLeft: n > 0 && n <= 3 ? n : null };
+      }),
       images: d.images.filter((i) => svc.VISIBLE_IMAGE.includes(i.status)).map(({ status: _s, ...i }) => i),
     };
   });

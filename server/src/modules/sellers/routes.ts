@@ -8,6 +8,7 @@ import { authenticate, requirePermission } from "../auth/guard.js";
 import { cursorTime, decodeCursor, encodeCursor, page, pageQuery } from "../../lib/pagination.js";
 import { ADMIN_ACTIONS, GSTIN_RE, IFSC_RE, PAN_RE, type AdminAction } from "./rules.js";
 import * as svc from "./service.js";
+import { refreshSearchSoon } from "../inventory/routes.js";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const upper = (re: RegExp, msg: string) => z.string().trim().toUpperCase().regex(re, msg);
@@ -59,7 +60,10 @@ export async function sellerRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch("/application", async (req) => {
     const body = parse(patchBody, req.body);
-    return svc.view(app.db, await svc.update(deps(), ctxOf(req), body), false);
+    const id = await svc.update(deps(), ctxOf(req), body);
+    // A store-name change queues the seller's products for a search refresh.
+    await refreshSearchSoon(app);
+    return svc.view(app.db, id, false);
   });
 
   app.post("/application/submit", async (req) => {

@@ -175,6 +175,12 @@ describe("review", () => {
     const submission = (await call(admin, "GET", `/admin/catalogue/products/${productId}`)).json().submission;
     const r = await call(admin, "POST", `/admin/catalogue/products/${productId}/approve`, { submission });
     expect(r.json().status).toBe("active");
+    // Live but no stock yet: hidden from search by default, shown as sold out when asked.
+    expect((await call(null, "GET", "/catalogue/products")).json().items).toHaveLength(0);
+    expect((await call(null, "GET", "/catalogue/products?includeOutOfStock=true")).json().items[0].inStock).toBe(false);
+    for (const v of r.json().variants) {
+      expect((await call(alice, "PUT", `/seller/inventory/${v.id}`, { onHand: 4, expectedOnHand: 0 })).statusCode).toBe(200);
+    }
     const list = (await call(null, "GET", "/catalogue/products?category=women")).json().items;
     expect(list.map((x: any) => x.id)).toEqual([productId]);
     expect(list[0].minPricePaise).toBe(49900);

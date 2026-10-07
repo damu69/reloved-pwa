@@ -18,10 +18,11 @@ responses carry `currency: "INR"`.
 | 401 | `UNAUTHENTICATED`, `SESSION_EXPIRED`, `INVALID_CREDENTIALS` |
 | 403 | `FORBIDDEN`, `ACCOUNT_SUSPENDED`, `NOT_A_SELLER`, `SELLER_NOT_APPROVED`, `SELLER_SUSPENDED` |
 | 404 | `NOT_FOUND` (also used for records you may not see, so ids cannot be probed) |
-| 409 | `ACCOUNT_EXISTS`, `LAST_ADMIN`, `APPLICATION_EXISTS`, `STORE_NAME_TAKEN`, `GSTIN_IN_USE`, `TOO_MANY_DOCUMENTS`, `SKU_TAKEN`, `VARIANT_EXISTS`, `TOO_MANY_IMAGES`, `CATEGORY_EXISTS`, `CATEGORY_HAS_PRODUCTS`, `CATEGORY_HAS_CHILDREN`, `BRAND_EXISTS`, `REVISION_CHANGED`, `PRODUCT_CHANGED` |
+| 409 | `INSUFFICIENT_STOCK`, `OUT_OF_STOCK`, `STOCK_CHANGED`, `STOCK_BELOW_RESERVED`, `WAREHOUSE_EXISTS`, `ACCOUNT_EXISTS`, `LAST_ADMIN`, `APPLICATION_EXISTS`, `STORE_NAME_TAKEN`, `GSTIN_IN_USE`, `TOO_MANY_DOCUMENTS`, `SKU_TAKEN`, `VARIANT_EXISTS`, `TOO_MANY_IMAGES`, `CATEGORY_EXISTS`, `CATEGORY_HAS_PRODUCTS`, `CATEGORY_HAS_CHILDREN`, `BRAND_EXISTS`, `REVISION_CHANGED`, `PRODUCT_CHANGED` |
 | 413 / 415 | `FILE_TOO_LARGE` / `UNSUPPORTED_FILE_TYPE` |
-| 422 | `INVALID_TRANSITION`, `PRODUCT_INCOMPLETE`, `INVALID_IMAGE`, `APPLICATION_INCOMPLETE`, `DOCUMENTS_NOT_ACCEPTED`, `BANK_ACCOUNT_MISSING`, `BANK_PROOF_REQUIRED` |
+| 422 | `STOCK_LIMIT`, `INVALID_TRANSITION`, `PRODUCT_INCOMPLETE`, `INVALID_IMAGE`, `APPLICATION_INCOMPLETE`, `DOCUMENTS_NOT_ACCEPTED`, `BANK_ACCOUNT_MISSING`, `BANK_PROOF_REQUIRED` |
 | 429 | `RATE_LIMITED` |
+| 503 | `TRY_AGAIN` (two changes collided; nothing was saved; retry) |
 | 500 | `INTERNAL` (no internal details; quote the requestId to support) |
 
 **Authentication.** `Authorization: Bearer <accessToken>` (15 minutes). The refresh token is an
@@ -148,6 +149,37 @@ Only live products of approved sellers in active categories with at least one ac
 | `GET /catalogue/products` | Search and browse. Parameters: `q` (words; matches title, SKU, brand, category, attributes, seller, description; tolerates small typos; works with Hindi and other scripts), `category` (path, includes subcategories), `brand` (slugs, comma-separated, up to 10), `sellerId`, `condition` (comma-separated), `minPrice` and `maxPrice` (in rupees), `sort` (`relevance` default with `q`, `newest` default without, `price_asc`, `price_desc`), `limit` (1–60, default 24), `cursor`. Returns `{ items, nextCursor, sort }`; items carry `minPricePaise` and `currency` |
 | `GET /catalogue/products/:id` | Live content, active variants, live photos |
 | `GET /catalogue/media/products/:id/:imageId/:size` | `size` 200, 600 or 1200; WebP; cached for 1 hour |
+
+## Inventory: seller (approved sellers, own variants and warehouses only)
+
+Counters per variant and warehouse: `onHand` (sellable units in the warehouse, including held ones),
+`reserved` (held for unpaid checkouts, released after 15 minutes), `available` = onHand − reserved,
+`sold`, `returned` (waiting to be restocked) and `damaged`. Adding to a cart never changes stock.
+Every change is kept in an append-only movement history.
+
+| Method and path | Notes |
+| --- | --- |
+| `GET /seller/inventory/warehouses` | The first warehouse is created from your business address when you first set stock |
+| `POST /seller/inventory/warehouses` | `name`, `pincode`, `city?`, `isDefault?` |
+| `PATCH /seller/inventory/warehouses/:id` | `name`, `isDefault: true`, `isActive`. The default warehouse must stay active. Stock in an inactive warehouse cannot be bought |
+| `GET /seller/inventory?productId&lowStock=true&limit&cursor` | Stock rows with `isLow` (available ≤ the row's low-stock threshold) |
+| `PUT /seller/inventory/:variantId` | `onHand`, `expectedOnHand` (what you last saw), `warehouseId?`, `lowStockThreshold?`. 409 `STOCK_CHANGED` with `currentOnHand` if it changed meanwhile, for example after a sale |
+| `POST /seller/inventory/:variantId/adjust` | `delta`, `reason` (`restock` +, `correction` ±, `damage` −, moves units to damaged, `loss` −), `warehouseId?`, `note?`. Cannot go below held units (409 `STOCK_BELOW_RESERVED`) |
+| `POST /seller/inventory/:variantId/restock-returned` | `quantity`: returned units back into sellable stock |
+| `GET /seller/inventory/:variantId/movements?before&limit` | History, newest first |
+
+## Inventory: admin
+
+| Method and path | Permission | Notes |
+| --- | --- | --- |
+| `GET /admin/inventory/movements?variantId&sellerId&before&limit` | `admin.inventory.manage` | |
+| `POST /admin/inventory/:variantId/adjust` | `admin.inventory.manage` | `warehouseId`, `delta`, `reason`, `note` (required). Audited. Not for your own seller account |
+
+## Availability for buyers
+
+Search hides sold-out products unless `includeOutOfStock=true`; results carry `inStock`. On the
+product page each variant has `inStock` and `onlyLeft` (a number when 3 or fewer can be bought,
+otherwise null). Exact stock counts are never published.
 
 ## Health
 

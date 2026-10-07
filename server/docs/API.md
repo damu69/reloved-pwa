@@ -14,13 +14,13 @@ responses carry `currency: "INR"`.
 
 | Status | Codes |
 | --- | --- |
-| 400 | `VALIDATION_FAILED`, `BAD_REQUEST`, `INVALID_TOKEN` |
+| 400 | `IDEMPOTENCY_KEY_REQUIRED`, `VALIDATION_FAILED`, `BAD_REQUEST`, `INVALID_TOKEN` |
 | 401 | `UNAUTHENTICATED`, `SESSION_EXPIRED`, `INVALID_CREDENTIALS` |
 | 403 | `OWN_PRODUCT`, `FORBIDDEN`, `ACCOUNT_SUSPENDED`, `NOT_A_SELLER`, `SELLER_NOT_APPROVED`, `SELLER_SUSPENDED` |
 | 404 | `NOT_FOUND` (also used for records you may not see, so ids cannot be probed) |
-| 409 | `ONLY_N_LEFT`, `CART_FULL`, `COUPON_EXISTS`, `WISHLIST_FULL`, `INSUFFICIENT_STOCK`, `OUT_OF_STOCK`, `STOCK_CHANGED`, `STOCK_BELOW_RESERVED`, `WAREHOUSE_EXISTS`, `ACCOUNT_EXISTS`, `LAST_ADMIN`, `APPLICATION_EXISTS`, `STORE_NAME_TAKEN`, `GSTIN_IN_USE`, `TOO_MANY_DOCUMENTS`, `SKU_TAKEN`, `VARIANT_EXISTS`, `TOO_MANY_IMAGES`, `CATEGORY_EXISTS`, `CATEGORY_HAS_PRODUCTS`, `CATEGORY_HAS_CHILDREN`, `BRAND_EXISTS`, `REVISION_CHANGED`, `PRODUCT_CHANGED` |
+| 409 | `TOTAL_CHANGED`, `CART_NOT_READY`, `PENDING_ORDER_EXISTS`, `COUPON_PROBLEM`, `COUPON_LIMIT_REACHED`, `COUPON_FIRST_ORDER_ONLY`, `ORDER_NOT_PAYABLE`, `ONLY_N_LEFT`, `CART_FULL`, `COUPON_EXISTS`, `WISHLIST_FULL`, `INSUFFICIENT_STOCK`, `OUT_OF_STOCK`, `STOCK_CHANGED`, `STOCK_BELOW_RESERVED`, `WAREHOUSE_EXISTS`, `ACCOUNT_EXISTS`, `LAST_ADMIN`, `APPLICATION_EXISTS`, `STORE_NAME_TAKEN`, `GSTIN_IN_USE`, `TOO_MANY_DOCUMENTS`, `SKU_TAKEN`, `VARIANT_EXISTS`, `TOO_MANY_IMAGES`, `CATEGORY_EXISTS`, `CATEGORY_HAS_PRODUCTS`, `CATEGORY_HAS_CHILDREN`, `BRAND_EXISTS`, `REVISION_CHANGED`, `PRODUCT_CHANGED` |
 | 413 / 415 | `FILE_TOO_LARGE` / `UNSUPPORTED_FILE_TYPE` |
-| 422 | `COUPON_INVALID`, `COUPON_NOT_APPLICABLE`, `STOCK_LIMIT`, `INVALID_TRANSITION`, `PRODUCT_INCOMPLETE`, `INVALID_IMAGE`, `APPLICATION_INCOMPLETE`, `DOCUMENTS_NOT_ACCEPTED`, `BANK_ACCOUNT_MISSING`, `BANK_PROOF_REQUIRED` |
+| 422 | `IDEMPOTENCY_KEY_REUSED`, `COUPON_INVALID`, `COUPON_NOT_APPLICABLE`, `STOCK_LIMIT`, `INVALID_TRANSITION`, `PRODUCT_INCOMPLETE`, `INVALID_IMAGE`, `APPLICATION_INCOMPLETE`, `DOCUMENTS_NOT_ACCEPTED`, `BANK_ACCOUNT_MISSING`, `BANK_PROOF_REQUIRED` |
 | 429 | `RATE_LIMITED` |
 | 503 | `TRY_AGAIN` (two changes collided; nothing was saved; retry) |
 | 500 | `INTERNAL` (no internal details; quote the requestId to support) |
@@ -216,6 +216,42 @@ Line problems: `NOT_AVAILABLE`, `OWN_PRODUCT`, `OUT_OF_STOCK`, `ONLY_N_LEFT`, `Q
 | `GET /admin/pricing` | `admin.pricing.manage` | Settings and delivery options |
 | `PATCH /admin/pricing/settings` | `admin.pricing.manage` | `buyerFeeFixedPaise`, `buyerFeeBp`, `maxCartLines`, `maxLineQuantity`. Audited |
 | `PUT /admin/pricing/delivery-options/:code` | `admin.pricing.manage` | `label`, `feePaise`, `isActive`, `sortOrder`. At least one stays active. Audited |
+
+## Addresses (signed-in)
+
+`GET /me/addresses`, `POST /me/addresses` (`name`, `phone`, `line1`, `line2?`, `landmark?`, `city`, `state`,
+`pincode`, `isDefault?`; up to 20; the first one is the default), `PATCH /me/addresses/:id`, `DELETE /me/addresses/:id`.
+Orders keep their own copy of the address, so later edits do not change past orders.
+
+## Checkout and orders (signed-in buyers)
+
+| Method and path | Notes |
+| --- | --- |
+| `POST /checkout` | Header `Idempotency-Key` (8–100 characters, new for each checkout). Body `{ addressId, expectedTotalPaise }`: the total the buyer saw in the cart. Creates one order with one package per seller, holds the stock for 15 minutes and uses one coupon use. 201 new order; 200 with the same order when the same key and body are sent again; 422 `IDEMPOTENCY_KEY_REUSED` if the key was used with a different body; 409 `TOTAL_CHANGED` (with `totalPaise`), `CART_NOT_READY`, `PENDING_ORDER_EXISTS` (with `orderId`), `OUT_OF_STOCK`, `COUPON_*` |
+| `GET /orders?status&limit&cursor` | Your orders, newest first |
+| `GET /orders/:id` | Totals, address, packages with items, delivery, tracking and full status history |
+| `POST /orders/:id/cancel` | Only before payment; gives back the stock and the coupon use |
+
+An unpaid order is cancelled automatically when its payment window ends. Payment (Razorpay) arrives
+in step 10; until then orders cannot be paid through the API. The customer-facing order status is
+derived from the packages: `pending_payment`, `confirmed`, `processing`, `partially_shipped`, `shipped`,
+`partially_delivered`, `delivered`, `cancelled`.
+
+## Orders: seller (approved sellers, own packages only)
+
+| Method and path | Notes |
+| --- | --- |
+| `GET /seller/orders?status&limit&cursor` | Your packages |
+| `GET /seller/orders/:id` | Only your package and items; the delivery address appears once the order is paid |
+| `POST /seller/orders/:id/status` | `{ to, carrier?, trackingNumber?, reason? }`. Steps: confirmed → processing → shipped (carrier and tracking required, given only here) → out_for_delivery → delivered. Meet-and-collect may go from confirmed or processing straight to delivered. Cancelling paid packages arrives with refunds (step 11) |
+
+## Orders: admin
+
+| Method and path | Permission | Notes |
+| --- | --- | --- |
+| `GET /admin/orders?status&userId&sellerId&number&limit&cursor` | `admin.orders.read` | |
+| `GET /admin/orders/:id` | `admin.orders.read` | Includes who made each status change |
+| `POST /admin/seller-orders/:id/status` | `admin.orders.manage` | Same steps as sellers; `reason` required; audited; not for orders you are part of |
 
 ## Health
 

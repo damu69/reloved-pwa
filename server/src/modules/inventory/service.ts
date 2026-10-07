@@ -195,7 +195,8 @@ export async function expireDue(db: Db, batch = 100): Promise<number> {
   for (;;) {
     const n = await withTx(db, async (tx) => {
       const r = await tx.query(
-        `select id from stock_reservations where status = 'active' and expires_at <= now()
+        // Holds that belong to an order are released by the order sweep, which also cancels the order.
+        `select id from stock_reservations where status = 'active' and expires_at <= now() and reference_type <> 'order'
           order by expires_at limit $1 for update skip locked`,
         [batch],
       );

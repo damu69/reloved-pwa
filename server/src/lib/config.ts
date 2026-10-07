@@ -15,6 +15,8 @@ const schema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
   // Absolute limit for one login, however often it is refreshed.
   SESSION_MAX_DAYS: z.coerce.number().int().min(1).max(365).default(90),
+  // How long checkout holds stock (and the order waits) for payment.
+  PAYMENT_WINDOW_MINUTES: z.coerce.number().int().min(5).max(60).default(15),
   PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().min(5).max(120).default(30),
   CORS_ORIGINS: z.string().default("http://localhost:5173"),
   COOKIE_SECURE: z.enum(["true", "false"]).default("true"),

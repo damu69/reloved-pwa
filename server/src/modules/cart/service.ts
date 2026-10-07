@@ -81,7 +81,12 @@ const COUPON_MESSAGES: Record<string, string> = {
 
 // ---------- the quote ----------
 
-export async function view(db: Db, userId: string) {
+// The public cart view. Checkout calls compute() inside its own transaction to price the very same way.
+export async function view(db: Queryable, userId: string) {
+  return (await compute(db, userId)).view;
+}
+
+export async function compute(db: Queryable, userId: string) {
   const id = await cartId(db, userId);
   const cart = (await db.query(`select * from carts where id = $1`, [id])).rows[0];
   // Quantities come from the same query as the item facts, so a concurrent removal cannot leave a gap.
@@ -142,7 +147,7 @@ export async function view(db: Db, userId: string) {
 
   const pricedByVariant = new Map(q.packages.flatMap((p) => p.lines).map((l) => [l.variantId, l]));
   const sellerName = new Map(lines.map((l) => [l.f.seller_id, l.f.seller_name]));
-  return {
+  const publicView = {
     currency: CURRENCY,
     items: lines.map(({ f, q: cq, problems }) => {
       const p = pricedByVariant.get(f.variant_id);
@@ -166,11 +171,16 @@ export async function view(db: Db, userId: string) {
     },
     canCheckout: lines.length > 0 && lines.every((l) => !l.blocking),
   };
+  return {
+    view: publicView,
+    internal: { cartId: id, couponId: cart.coupon_id as string | null, couponRule, couponIssue, quote: q, settings: st,
+      facts: new Map(ok.map((l) => [l.f.variant_id as string, l.f])) },
+  };
 }
 
 // ---------- changes ----------
 
-async function lockCart(tx: Tx, userId: string) {
+export async function lockCart(tx: Tx, userId: string) {
   const id = await cartId(tx, userId);
   await tx.query(`select id from carts where id = $1 for update`, [id]);
   return id;

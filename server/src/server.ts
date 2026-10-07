@@ -2,6 +2,7 @@ import { loadConfig } from "./lib/config.js";
 import { createPool } from "./lib/db.js";
 import { buildApp } from "./app.js";
 import { expireDue, processSearchQueue } from "./modules/inventory/service.js";
+import { expireUnpaidOrders } from "./modules/orders/service.js";
 
 const cfg = loadConfig();
 const db = createPool(cfg);
@@ -26,7 +27,10 @@ let sweeping = false;
 const sweep = setInterval(() => {
   if (sweeping) return; // never overlap with a slow previous run
   sweeping = true;
-  expireDue(db)
+  expireUnpaidOrders(db)
+    .then((n) => { if (n) app.log.info({ cancelled: n }, "cancelled unpaid orders past their payment window"); })
+    .catch((err) => app.log.error({ err }, "unpaid order sweep failed"))
+    .then(() => expireDue(db))
     .then((n) => { if (n) app.log.info({ released: n }, "expired stock reservations"); })
     .catch((err) => app.log.error({ err }, "reservation sweep failed"))
     .then(() => processSearchQueue(db))

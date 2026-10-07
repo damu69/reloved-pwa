@@ -4,7 +4,7 @@ import { parse, safeText, uuid as uuidField } from "../../lib/validate.js";
 import { Errors } from "../../lib/errors.js";
 import { withTx } from "../../lib/db.js";
 import { writeAudit } from "../../lib/audit.js";
-import { decodeCursor, encodeCursor, page, pageQuery } from "../../lib/pagination.js";
+import { cursorTime, decodeCursor, encodeCursor, page, pageQuery } from "../../lib/pagination.js";
 import { authenticate, requirePermission } from "../auth/guard.js";
 
 const uuid = uuidField();
@@ -24,7 +24,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     }), req.query);
     const c = decodeCursor(q.cursor);
     const r = await db.query(
-      `select u.id, u.email, u.full_name, u.phone, u.status, u.created_at,
+      `select u.id, u.email, u.full_name, u.phone, u.status, u.created_at, ${cursorTime("u.created_at")},
               coalesce((select array_agg(role_key order by role_key) from user_roles where user_id = u.id), '{}') as roles
          from users u
         where ($1::text is null or u.email ilike '%' || $1 || '%' or u.full_name ilike '%' || $1 || '%')
@@ -35,7 +35,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         limit $6`,
       [q.q ?? null, q.status ?? null, q.role ?? null, c?.t ?? null, c?.id ?? null, q.limit + 1],
     );
-    const p = page(r.rows, q.limit, (u: any) => encodeCursor(u.created_at, u.id));
+    const p = page(r.rows, q.limit, (u: any) => encodeCursor(u.cursor_t, u.id));
     return {
       items: p.items.map((u: any) => ({ id: u.id, email: u.email, fullName: u.full_name, phone: u.phone, status: u.status, roles: u.roles, createdAt: u.created_at })),
       nextCursor: p.nextCursor,
@@ -106,7 +106,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     }), req.query);
     const c = decodeCursor(q.cursor);
     const r = await db.query(
-      `select id, actor_user_id, action, entity, entity_id, old_value, new_value, ip, request_id, created_at
+      `select id, actor_user_id, action, entity, entity_id, old_value, new_value, ip, request_id, created_at, ${cursorTime("created_at")}
          from audit_logs
         where ($1::text is null or entity = $1) and ($2::text is null or entity_id = $2)
           and ($3::uuid is null or actor_user_id = $3) and ($4::text is null or action = $4)
@@ -115,7 +115,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         order by created_at desc, id desc limit $9`,
       [q.entity ?? null, q.entityId ?? null, q.actorUserId ?? null, q.action ?? null, q.from ?? null, q.to ?? null, c?.t ?? null, c?.id ?? null, q.limit + 1],
     );
-    const p = page(r.rows, q.limit, (a: any) => encodeCursor(a.created_at, a.id));
+    const p = page(r.rows, q.limit, (a: any) => encodeCursor(a.cursor_t, a.id));
     return {
       items: p.items.map((a: any) => ({
         id: String(a.id), actorUserId: a.actor_user_id, action: a.action, entity: a.entity, entityId: a.entity_id,

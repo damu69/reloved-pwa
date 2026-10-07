@@ -1,6 +1,8 @@
 # Reloved API v1
 
 Base path `/api/v1`. JSON only. Every response carries an `x-request-id` header.
+All money is in Indian rupees (INR), as integer paise (₹1 = 100 paise); prices include GST. Price
+responses carry `currency: "INR"`.
 
 ## Conventions
 
@@ -143,7 +145,7 @@ Only live products of approved sellers in active categories with at least one ac
 | Method and path | Notes |
 | --- | --- |
 | `GET /catalogue/categories`, `/catalogue/brands`, `/catalogue/gst-rates` | |
-| `GET /catalogue/products?category=women/tops&brand=zara&sellerId&limit&cursor` | Newest first; `category` includes its subcategories |
+| `GET /catalogue/products` | Search and browse. Parameters: `q` (words; matches title, SKU, brand, category, attributes, seller, description; tolerates small typos; works with Hindi and other scripts), `category` (path, includes subcategories), `brand` (slugs, comma-separated, up to 10), `sellerId`, `condition` (comma-separated), `minPrice` and `maxPrice` (in rupees), `sort` (`relevance` default with `q`, `newest` default without, `price_asc`, `price_desc`), `limit` (1–60, default 24), `cursor`. Returns `{ items, nextCursor, sort }`; items carry `minPricePaise` and `currency` |
 | `GET /catalogue/products/:id` | Live content, active variants, live photos |
 | `GET /catalogue/media/products/:id/:imageId/:size` | `size` 200, 600 or 1200; WebP; cached for 1 hour |
 

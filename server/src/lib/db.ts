@@ -6,7 +6,7 @@ export type Tx = pg.PoolClient;
 export type Queryable = pg.Pool | pg.PoolClient;
 
 export function createPool(cfg: Config): pg.Pool {
-  return new pg.Pool({
+  const pool = new pg.Pool({
     connectionString: cfg.DATABASE_URL,
     ssl:
       cfg.DATABASE_SSL === "off" ? undefined
@@ -17,6 +17,10 @@ export function createPool(cfg: Config): pg.Pool {
     connectionTimeoutMillis: 5_000,
     statement_timeout: 15_000,
   });
+  // An idle connection can be closed by the database (restart, failover). Without this handler
+  // Node treats it as an unhandled error and the whole API process exits.
+  pool.on("error", (err) => console.error(JSON.stringify({ level: "error", msg: "idle database connection lost", err: err.message })));
+  return pool;
 }
 
 // Runs fn inside one transaction. Rolls back on any error, so partial writes never persist.

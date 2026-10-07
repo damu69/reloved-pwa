@@ -20,8 +20,13 @@ export function decodeCursor(c?: string): Cursor | null {
   }
 }
 
-export const encodeCursor = (t: Date | string, id: string | number): string =>
-  Buffer.from(JSON.stringify({ t: new Date(t).toISOString(), id: String(id) })).toString("base64url");
+// Pass the `cursor_t` column produced by cursorTime(): it keeps the database's microseconds.
+// (A JavaScript Date keeps only milliseconds, which would skip rows created within the same millisecond.)
+export const encodeCursor = (t: string, id: string | number): string =>
+  Buffer.from(JSON.stringify({ t, id: String(id) })).toString("base64url");
+
+// SQL select expression giving an exact, ISO-formatted timestamp for cursors.
+export const cursorTime = (col: string) => `to_char(${col} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_t`;
 
 export function page<T>(rows: T[], limit: number, cursorOf: (r: T) => string) {
   const hasMore = rows.length > limit;

@@ -12,7 +12,8 @@ it module by module.
 | 2 | Auth, roles, permissions, sessions, audit log, admin user management | Done |
 | 3 | Seller applications, KYC documents, bank accounts, admin review | Done |
 | 4 | Catalogue: categories, brands, GST rates, products, variants, photos, review of new products and of edits to live ones | Done |
-| 5 | Search and filters | Next |
+| 5 | Search: full text with typo tolerance (English and Indian scripts), filters, sorting, cursor pagination | Done |
+| 6 | Inventory: stock, reservations, no overselling | Next |
 | 4+ | Catalogue, search, inventory, cart, checkout, ledger, payments (MOCK), refunds, notifications, dashboards | Planned |
 
 The existing PWA at the repo root still talks to Supabase directly. It moves to this API
@@ -58,7 +59,11 @@ submission locking, document review, approval races, re-review after edits, role
 bank account changes after approval, and self-review protection; and the catalogue: leaf categories,
 GST rates, SKU and option rules, photo type, size, metadata stripping and caps, cross-seller access,
 submission and review, edits to live products waiting as versioned pending changes, stale approvals,
-instant audited price changes, archive, block, seller suspension and public visibility.
+instant audited price changes, archive, block, seller suspension and public visibility; and search:
+matching across fields, Hindi text, typos, unsafe input, filters, every sort order paged with ties,
+microsecond timestamps, concurrent edits and suspensions, and 10,000-product timings.
+
+All money in the API is integer paise in Indian rupees (INR); prices include GST.
 CI runs them on every push that touches `server/`. To turn CI on, move `server/ci/server-ci.yml` to
 `.github/workflows/server-ci.yml` (in File Explorer or on github.com) and commit it.
 

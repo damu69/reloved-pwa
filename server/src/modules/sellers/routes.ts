@@ -5,7 +5,7 @@ import { parse, safeText, uuid } from "../../lib/validate.js";
 import { AppError, Errors } from "../../lib/errors.js";
 import { sniffDocumentType } from "../../lib/storage.js";
 import { authenticate, requirePermission } from "../auth/guard.js";
-import { decodeCursor, encodeCursor, page, pageQuery } from "../../lib/pagination.js";
+import { cursorTime, decodeCursor, encodeCursor, page, pageQuery } from "../../lib/pagination.js";
 import { ADMIN_ACTIONS, GSTIN_RE, IFSC_RE, PAN_RE, type AdminAction } from "./rules.js";
 import * as svc from "./service.js";
 
@@ -126,7 +126,7 @@ export async function adminSellerRoutes(app: FastifyInstance): Promise<void> {
     }), req.query);
     const c = decodeCursor(q.cursor);
     const r = await app.db.query(
-      `select s.id, s.status, s.display_name, s.business_name, s.city, s.state, s.submitted_at, s.created_at, u.email
+      `select s.id, s.status, s.display_name, s.business_name, s.city, s.state, s.submitted_at, s.created_at, ${cursorTime("s.created_at")}, u.email
          from sellers s join users u on u.id = s.user_id
         where ($1::text is null or s.status = $1)
           and ($2::text is null or s.display_name ilike '%' || $2 || '%' or s.business_name ilike '%' || $2 || '%' or u.email ilike '%' || $2 || '%')
@@ -134,7 +134,7 @@ export async function adminSellerRoutes(app: FastifyInstance): Promise<void> {
         order by s.created_at desc, s.id desc limit $5`,
       [q.status ?? null, q.q ?? null, c?.t ?? null, c?.id ?? null, q.limit + 1],
     );
-    const p = page(r.rows, q.limit, (s: any) => encodeCursor(s.created_at, s.id));
+    const p = page(r.rows, q.limit, (s: any) => encodeCursor(s.cursor_t, s.id));
     return {
       items: p.items.map((s: any) => ({ id: s.id, status: s.status, displayName: s.display_name, businessName: s.business_name, email: s.email, city: s.city, state: s.state, submittedAt: s.submitted_at, createdAt: s.created_at })),
       nextCursor: p.nextCursor,

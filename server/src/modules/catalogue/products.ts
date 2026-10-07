@@ -5,6 +5,7 @@ import { AppError, Errors } from "../../lib/errors.js";
 import { writeAudit } from "../../lib/audit.js";
 import type { Storage } from "../../lib/storage.js";
 import { IMAGE_SIZES, ImageError, processProductImage, type ImageSize } from "../../lib/images.js";
+import { CURRENCY } from "../../lib/money.js";
 import { CONTENT_COLUMNS, checkRefs, contentOf, notSellable, sellableProblems, type Content } from "./content.js";
 
 export interface Ctx { actorUserId: string; ip: string | null; requestId: string }
@@ -425,7 +426,7 @@ export async function detail(db: Db, productId: string, opts: { sellerId?: strin
     `select status, review_note, reviewed_at from product_revisions where product_id = $1 and status in ('approved', 'rejected') order by reviewed_at desc limit 1`, [p.id],
   )).rows[0];
   return {
-    id: p.id, status: p.status, reviewNote: p.review_note, submission: p.submission,
+    id: p.id, status: p.status, reviewNote: p.review_note, submission: p.submission, currency: CURRENCY,
     ...contentOf(p),
     categoryPath: p.category_path, categoryName: p.category_name, brandName: p.brand_name,
     seller: { id: p.seller_id, displayName: p.seller_name, status: opts.admin ? p.seller_status : undefined },

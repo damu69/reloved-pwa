@@ -4,7 +4,7 @@ import { parse, safeText, uuid } from "../../lib/validate.js";
 import { AppError, Errors } from "../../lib/errors.js";
 import { withTx } from "../../lib/db.js";
 import { writeAudit } from "../../lib/audit.js";
-import { decodeCursor, encodeCursor, page, pageQuery } from "../../lib/pagination.js";
+import { cursorTime, decodeCursor, encodeCursor, page, pageQuery } from "../../lib/pagination.js";
 import { MAX_IMAGE_BYTES } from "../../lib/images.js";
 import { authenticate, requirePermission } from "../auth/guard.js";
 import { requireApprovedSeller } from "../sellers/guard.js";
@@ -48,7 +48,7 @@ export async function sellerCatalogueRoutes(app: FastifyInstance): Promise<void>
     const q = parse(pageQuery.extend({ status: z.enum(["draft", "pending", "active", "rejected", "archived", "blocked"]).optional() }), req.query);
     const c = decodeCursor(q.cursor);
     const r = await app.db.query(
-      `select p.id, p.title, p.status, p.created_at, p.updated_at,
+      `select p.id, p.title, p.status, p.created_at, p.updated_at, ${cursorTime("p.created_at")},
               exists (select 1 from product_revisions r where r.product_id = p.id and r.status = 'pending') as has_pending_change,
               (select min(price_paise) from product_variants v where v.product_id = p.id and v.deleted_at is null and v.is_active) as min_price
          from products p
@@ -57,7 +57,7 @@ export async function sellerCatalogueRoutes(app: FastifyInstance): Promise<void>
         order by p.created_at desc, p.id desc limit $5`,
       [sid(req), q.status ?? null, c?.t ?? null, c?.id ?? null, q.limit + 1],
     );
-    const pg = page(r.rows, q.limit, (x: any) => encodeCursor(x.created_at, x.id));
+    const pg = page(r.rows, q.limit, (x: any) => encodeCursor(x.cursor_t, x.id));
     return {
       items: pg.items.map((x: any) => ({ id: x.id, title: x.title, status: x.status, hasPendingChange: x.has_pending_change, minPricePaise: x.min_price === null ? null : Number(x.min_price), createdAt: x.created_at, updatedAt: x.updated_at })),
       nextCursor: pg.nextCursor,
@@ -260,14 +260,14 @@ export async function adminCatalogueRoutes(app: FastifyInstance): Promise<void> 
     }), req.query);
     const c = decodeCursor(q.cursor);
     const r = await app.db.query(
-      `select p.id, p.title, p.status, p.submitted_at, p.created_at, s.display_name
+      `select p.id, p.title, p.status, p.submitted_at, p.created_at, ${cursorTime("p.created_at")}, s.display_name
          from products p join sellers s on s.id = p.seller_id
         where p.deleted_at is null and ($1::text is null or p.status = $1) and ($2::uuid is null or p.seller_id = $2)
           and ($3::timestamptz is null or (p.created_at, p.id) < ($3, $4::uuid))
         order by p.created_at desc, p.id desc limit $5`,
       [q.status ?? null, q.sellerId ?? null, c?.t ?? null, c?.id ?? null, q.limit + 1],
     );
-    const pg = page(r.rows, q.limit, (x: any) => encodeCursor(x.created_at, x.id));
+    const pg = page(r.rows, q.limit, (x: any) => encodeCursor(x.cursor_t, x.id));
     return { items: pg.items.map((x: any) => ({ id: x.id, title: x.title, status: x.status, sellerName: x.display_name, submittedAt: x.submitted_at, createdAt: x.created_at })), nextCursor: pg.nextCursor };
   });
 
@@ -275,13 +275,13 @@ export async function adminCatalogueRoutes(app: FastifyInstance): Promise<void> 
     const q = parse(pageQuery, req.query);
     const c = decodeCursor(q.cursor);
     const r = await app.db.query(
-      `select r.id, r.product_id, r.version, r.created_at, p.title, s.display_name
+      `select r.id, r.product_id, r.version, r.created_at, ${cursorTime("r.created_at")}, p.title, s.display_name
          from product_revisions r join products p on p.id = r.product_id join sellers s on s.id = p.seller_id
         where r.status = 'pending' and ($1::timestamptz is null or (r.created_at, r.id) < ($1, $2::uuid))
         order by r.created_at desc, r.id desc limit $3`,
       [c?.t ?? null, c?.id ?? null, q.limit + 1],
     );
-    const pg = page(r.rows, q.limit, (x: any) => encodeCursor(x.created_at, x.id));
+    const pg = page(r.rows, q.limit, (x: any) => encodeCursor(x.cursor_t, x.id));
     return { items: pg.items.map((x: any) => ({ revisionId: x.id, productId: x.product_id, version: x.version, title: x.title, sellerName: x.display_name, createdAt: x.created_at })), nextCursor: pg.nextCursor };
   });
 
@@ -337,38 +337,31 @@ export async function publicCatalogueRoutes(app: FastifyInstance): Promise<void>
     return { items: r.rows.map((g) => ({ rateBp: g.rate_bp, label: g.label })) };
   });
 
-  // Newest first. Full search, sorting and price filters arrive with the search module (step 5).
+  // Browse and search. Full-text with typo tolerance, filters, sorting and cursor pagination.
+  const list = (max: number) => z.string().trim().max(400).optional()
+    .transform((v) => (v ? [...new Set(v.split(",").map((x) => x.trim()).filter(Boolean))] : undefined))
+    .refine((v) => !v || v.length <= max, `At most ${max} values`);
+  const rupees = z.coerce.number().min(0).max(1_000_000).optional();
   app.get("/products", async (req) => {
-    const q = parse(pageQuery.extend({
+    const q = parse(z.object({
+      q: z.string().max(200).optional(),
       category: z.string().trim().regex(/^[a-z0-9-]+(\/[a-z0-9-]+)*$/).max(300).optional(),
-      brand: z.string().trim().regex(/^[a-z0-9-]+$/).max(60).optional(),
+      brand: list(10).refine((v) => !v || v.every((b) => /^[a-z0-9-]{1,60}$/.test(b)), "Invalid brand"),
       sellerId: uuid().optional(),
+      condition: list(5).refine((v) => !v || v.every((c) => ["new_with_tags", "new", "very_good", "good", "satisfactory"].includes(c)), "Invalid condition"),
+      // Price filters are in rupees for convenience; results carry prices in paise.
+      minPrice: rupees,
+      maxPrice: rupees,
+      sort: z.enum(["relevance", "newest", "price_asc", "price_desc"]).optional(),
+      limit: z.coerce.number().int().min(1).max(60).default(24),
+      cursor: z.string().max(300).optional(),
     }), req.query);
-    const c = decodeCursor(q.cursor);
-    const r = await app.db.query(
-      `select p.id, p.title, p.condition, p.created_at, b.name as brand_name, s.display_name as seller_name,
-              (select min(v.price_paise) from product_variants v where v.product_id = p.id and v.is_active and v.deleted_at is null) as min_price,
-              (select i.id from product_images i where i.product_id = p.id and i.status in ('active', 'pending_remove') order by i.sort_order, i.created_at limit 1) as cover_id
-         from products p
-         join sellers s on s.id = p.seller_id
-         join categories c on c.id = p.category_id
-         left join brands b on b.id = p.brand_id
-        where ${VISIBLE}
-          and ($1::text is null or c.path = $1 or c.path like $1 || '/%')
-          and ($2::text is null or b.slug = $2)
-          and ($3::uuid is null or p.seller_id = $3)
-          and ($4::timestamptz is null or (p.created_at, p.id) < ($4, $5::uuid))
-        order by p.created_at desc, p.id desc limit $6`,
-      [q.category ?? null, q.brand ?? null, q.sellerId ?? null, c?.t ?? null, c?.id ?? null, q.limit + 1],
-    );
-    const pg = page(r.rows, q.limit, (x: any) => encodeCursor(x.created_at, x.id));
-    return {
-      items: pg.items.map((x: any) => ({
-        id: x.id, title: x.title, condition: x.condition, brandName: x.brand_name, sellerName: x.seller_name,
-        minPricePaise: Number(x.min_price), coverImageId: x.cover_id,
-      })),
-      nextCursor: pg.nextCursor,
-    };
+    return app.searchService.search({
+      q: q.q, category: q.category, brands: q.brand, sellerId: q.sellerId, conditions: q.condition,
+      minPricePaise: q.minPrice === undefined ? undefined : Math.round(q.minPrice * 100),
+      maxPricePaise: q.maxPrice === undefined ? undefined : Math.round(q.maxPrice * 100),
+      sort: q.sort, limit: q.limit, cursor: q.cursor,
+    });
   });
 
   app.get("/products/:id", async (req) => {
@@ -382,7 +375,7 @@ export async function publicCatalogueRoutes(app: FastifyInstance): Promise<void>
     // Public view: live content only. Pending edits, inactive variants and review notes stay private.
     return {
       id: d.id, title: d.title, description: d.description, condition: d.condition, attributes: d.attributes,
-      categoryPath: d.categoryPath, categoryName: d.categoryName, brandName: d.brandName, gstRateBp: d.gstRateBp,
+      categoryPath: d.categoryPath, categoryName: d.categoryName, brandName: d.brandName, gstRateBp: d.gstRateBp, currency: d.currency,
       seller: { id: d.seller.id, displayName: d.seller.displayName },
       variants: d.variants.filter((v) => v.isActive).map(({ isActive: _a, ...v }) => v),
       images: d.images.filter((i) => svc.VISIBLE_IMAGE.includes(i.status)).map(({ status: _s, ...i }) => i),

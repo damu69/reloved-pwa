@@ -14,6 +14,7 @@ import { adminSellerRoutes, sellerRoutes } from "./modules/sellers/routes.js";
 import { adminCatalogueRoutes, publicCatalogueRoutes, sellerCatalogueRoutes } from "./modules/catalogue/routes.js";
 import { createFieldCipher, type FieldCipher } from "./lib/encryption.js";
 import { createStorage, type Storage } from "./lib/storage.js";
+import { PostgresSearch, type SearchService } from "./modules/search/service.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -21,6 +22,7 @@ declare module "fastify" {
     db: Db;
     cipher: FieldCipher;
     storage: Storage;
+    searchService: SearchService;
   }
 }
 
@@ -41,6 +43,7 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
   app.decorate("db", db);
   app.decorate("cipher", createFieldCipher(cfg));
   app.decorate("storage", overrides.storage ?? createStorage(cfg));
+  app.decorate("searchService", new PostgresSearch(db));
   app.decorateRequest("auth", null);
   app.decorateRequest("seller", null);
 

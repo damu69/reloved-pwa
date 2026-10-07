@@ -28,6 +28,7 @@ export async function setup(): Promise<{ app: FastifyInstance; pool: pg.Pool; cf
     STORAGE_LOCAL_DIR: `/tmp/reloved-test-storage/${name}`,
   } as any);
   const pool = new pg.Pool({ connectionString: cfg.DATABASE_URL, max: 20 });
+  pool.on("error", () => {}); // connections are force-closed when the test database is dropped
   await migrate(pool, fileURLToPath(new URL("../migrations", import.meta.url)), () => {});
   const app = await buildApp(cfg, pool);
   return {

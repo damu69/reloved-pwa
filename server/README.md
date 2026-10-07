@@ -102,7 +102,11 @@ All money in the API is integer paise in Indian rupees (INR); prices include GST
 CI runs them on every push that touches `server/`. To turn CI on, move `server/ci/server-ci.yml` to
 `.github/workflows/server-ci.yml` (in File Explorer or on github.com) and commit it.
 
-## Deploy (when ready)
+## Deploy
+
+Trial deployment (Vercel + the existing Supabase project, payments paused): see `docs/DEPLOY.md`.
+
+### Other hosts
 
 - Host the API as a Node service (Render, Railway, Fly.io) with `npm ci && npm run build`, start `npm start`.
 - Run `npm run migrate` as a release step before the new version starts; migrations are forward-only.

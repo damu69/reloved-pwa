@@ -4,7 +4,8 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
+import { runSweep } from "./lib/sweep.js";
 import type { Config } from "./lib/config.js";
 import type { Db } from "./lib/db.js";
 import { AppError } from "./lib/errors.js";
@@ -116,6 +117,19 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
   });
 
   app.get("/health", { config: { rateLimit: false } }, async () => ({ status: "ok" }));
+
+  // Background housekeeping for serverless hosting, called every minute by a scheduler
+  // (Supabase pg_cron). Only exists when CRON_SECRET is set; the secret is compared in constant time.
+  if (cfg.CRON_SECRET) {
+    const expected = Buffer.from(`Bearer ${cfg.CRON_SECRET}`);
+    app.post("/internal/sweep", { config: { rateLimit: false } }, async (req, reply) => {
+      const got = Buffer.from(String(req.headers.authorization ?? ""));
+      if (got.length !== expected.length || !timingSafeEqual(got, expected)) {
+        return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Not allowed.", requestId: req.id } });
+      }
+      return { ok: true, result: await runSweep(db, cfg, req.log) };
+    });
+  }
   app.get("/ready", { config: { rateLimit: false } }, async (_req, reply) => {
     try {
       await db.query("select 1");

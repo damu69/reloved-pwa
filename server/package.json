@@ -9,7 +9,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "migrate": "tsx src/scripts/migrate.ts",
     "grant-admin": "tsx src/scripts/grant-admin.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "vercel-build": "node scripts/vercel-build.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

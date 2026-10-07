@@ -9,6 +9,13 @@ const schema = z.object({
   // off: local only. require: encrypted. verify-full: encrypted and certificate checked (set DATABASE_CA_CERT if the provider uses its own CA).
   DATABASE_SSL: z.enum(["off", "require", "verify-full"]).default("off"),
   DATABASE_CA_CERT: z.string().optional(),
+  // Connections per API instance. Keep it small on serverless (each function instance has its own pool).
+  DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
+  // Sent when connecting. 0 = do not send (some connection poolers refuse it; set it on the database
+  // role instead, as db/supabase-setup.sql does).
+  DATABASE_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).max(120_000).default(15_000),
+  // Secret for POST /internal/sweep (background housekeeping called by a scheduler). Unset = endpoint off.
+  CRON_SECRET: z.string().min(32).optional(),
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   JWT_ISSUER: z.string().default("reloved-api"),
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),

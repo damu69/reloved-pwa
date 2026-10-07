@@ -12,10 +12,10 @@ export function createPool(cfg: Config): pg.Pool {
       cfg.DATABASE_SSL === "off" ? undefined
       : cfg.DATABASE_SSL === "require" ? { rejectUnauthorized: false }
       : { rejectUnauthorized: true, ...(cfg.DATABASE_CA_CERT ? { ca: cfg.DATABASE_CA_CERT } : {}) },
-    max: 10,
+    max: cfg.DATABASE_POOL_MAX,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
-    statement_timeout: 15_000,
+    ...(cfg.DATABASE_STATEMENT_TIMEOUT_MS ? { statement_timeout: cfg.DATABASE_STATEMENT_TIMEOUT_MS } : {}),
   });
   // An idle connection can be closed by the database (restart, failover). Without this handler
   // Node treats it as an unhandled error and the whole API process exits.

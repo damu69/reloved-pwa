@@ -28,6 +28,10 @@ do $$ begin
   end if;
 end $$;
 
+-- Supabase's "postgres" user is not a superuser: it must be a member of reloved_owner to create the
+-- schema for it and to set its default privileges.
+grant reloved_owner to current_user;
+
 create schema if not exists reloved authorization reloved_owner;
 revoke all on schema reloved from public;
 revoke all on schema reloved from anon, authenticated;

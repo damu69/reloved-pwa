@@ -17,6 +17,7 @@ import { createStorage, type Storage } from "./lib/storage.js";
 import { PostgresSearch, type SearchService } from "./modules/search/service.js";
 import { adminInventoryRoutes, sellerInventoryRoutes } from "./modules/inventory/routes.js";
 import { adminCouponRoutes, adminPricingRoutes, cartRoutes, wishlistRoutes } from "./modules/cart/routes.js";
+import { adminCommissionRoutes, adminFinanceRoutes, sellerFinanceRoutes } from "./modules/finance/routes.js";
 import { addressRoutes, adminOrderRoutes, orderRoutes, sellerOrderRoutes } from "./modules/orders/routes.js";
 
 declare module "fastify" {
@@ -141,6 +142,9 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
     await v1.register(orderRoutes);
     await v1.register(sellerOrderRoutes, { prefix: "/seller/orders" });
     await v1.register(adminOrderRoutes, { prefix: "/admin" });
+    await v1.register(adminCommissionRoutes, { prefix: "/admin/commission" });
+    await v1.register(adminFinanceRoutes, { prefix: "/admin/finance" });
+    await v1.register(sellerFinanceRoutes, { prefix: "/seller/finance" });
   }, { prefix: "/api/v1" });
 
   return app;

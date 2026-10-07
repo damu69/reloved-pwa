@@ -253,6 +253,50 @@ derived from the packages: `pending_payment`, `confirmed`, `processing`, `partia
 | `GET /admin/orders/:id` | `admin.orders.read` | Includes who made each status change |
 | `POST /admin/seller-orders/:id/status` | `admin.orders.manage` | Same steps as sellers; `reason` required; audited; not for orders you are part of |
 
+## Commission (admin)
+
+Commission is a percentage of the item price before any coupon (the platform pays for coupons),
+rounded half up to the paisa. The delivery fee goes to the seller with no commission. The most
+specific rule in force wins: product, then seller, then category (the deepest matching category,
+subcategories included), then the default (5% at launch). The rate is frozen on each order line at
+checkout; later rule changes never alter an order. If no rule is in force, checkout returns 503
+`COMMISSION_NOT_CONFIGURED` instead of guessing.
+
+| Method and path | Permission | Notes |
+| --- | --- | --- |
+| `GET /admin/commission/rules?scope&targetId&state&limit&cursor` | `admin.finance.read` | `state`: `active`, `scheduled`, `ended` |
+| `GET /admin/commission/preview?productId&at` | `admin.finance.read` | Which rule and rate apply to a product now (or at `at`) |
+| `POST /admin/commission/rules` | `admin.finance.manage` | `{ scope: category\|seller\|product, targetId, rateBp (0–5000), startsAt?, endsAt?, note? }`. 409 `RULE_OVERLAP` if another rule for the same target is in force at the same time. 403 for your own shop. Audited |
+| `POST /admin/commission/rules/:id/end` | `admin.finance.manage` | `{ reason, at? }`. Ends a rule now or later; a rule that has not started is called off. Rules are never edited or deleted |
+| `PUT /admin/commission/default` | `admin.finance.manage` | `{ rateBp, reason }`. Replaces the default from now on, with no gap |
+
+## Finance (admin)
+
+| Method and path | Permission | Notes |
+| --- | --- | --- |
+| `GET /admin/finance/settings` | `admin.finance.read` | `{ payoutHoldDays }` (14 at launch) |
+| `PATCH /admin/finance/settings` | `admin.finance.manage` | `{ payoutHoldDays (0–90), reason }`. Applies to orders paid from now on. Audited |
+| `GET /admin/finance/sellers/:id/balance` | `admin.finance.read` | `{ pendingPaise, availablePaise, paidOutPaise }` |
+| `GET /admin/finance/trial-balance` | `admin.finance.read` | Every ledger account; `totals.balanced` is always true |
+| `GET /admin/finance/transactions?referenceId&kind&limit&cursor` | `admin.finance.read` | Ledger transactions with their lines |
+
+When payment is confirmed, one ledger transaction books the order: debit payments receivable (order
+total) and coupon expense (discount); credit each seller's on-hold account (item price − commission
++ delivery fee), commission revenue and Buyer Protection revenue. After the hold (counted from
+payment) a background job moves each package's earning from on hold to available. Ledger lines can
+only be added; the database rejects unbalanced transactions, edits, deletes and truncation.
+Refunds (step 11): the seller's earning is reversed; the commission is not, and the platform bears it.
+
+## Earnings: seller (any seller, including suspended)
+
+| Method and path | Notes |
+| --- | --- |
+| `GET /seller/finance/balance` | `{ pendingPaise, availablePaise, paidOutPaise, nextReleaseAt, holdDaysFromPayment }` |
+| `GET /seller/finance/earnings?state&limit&cursor` | One row per paid package: item total, commission, delivery fee, earning, `on_hold` or `available`, and when |
+
+Seller and admin order views also show each package's `earnings` and each line's commission; buyers
+never see commission.
+
 ## Health
 
 `GET /health` (process alive) and `GET /ready` (database reachable, 503 if not).

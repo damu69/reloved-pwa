@@ -16,8 +16,9 @@ it module by module.
 | 6 | Inventory: warehouses, stock counters, checkout holds that expire, no overselling, stock history, availability in search | Done |
 | 7 | Cart, pricing engine, coupons, wishlist, admin fee settings | Done |
 | 8 | Addresses, idempotent checkout, multi-seller orders with frozen amounts, payment confirmation path, unpaid-order expiry, fulfilment steps | Done |
-| 9 | Ledger and commissions | Next |
-| 4+ | Catalogue, search, inventory, cart, checkout, ledger, payments (MOCK), refunds, notifications, dashboards | Planned |
+| 9 | Commission rules (product > seller > category > default), commission frozen per order line, append-only double-entry ledger, seller balances with a 14-day hold | Done |
+| 10 | Payments: provider interface with a MOCK provider, Razorpay later | Next |
+| 11+ | Refunds and cancellations, notifications, payouts, dashboards | Planned |
 
 The existing PWA at the repo root still talks to Supabase directly. It moves to this API
 module by module; nothing in the live app changes yet.
@@ -38,6 +39,9 @@ module by module; nothing in the live app changes yet.
 | No real payment yet: orders wait for the payment window and are then cancelled; `confirmPayment` is called only by tests until step 10 | `orders/service.ts` | Razorpay (step 10) |
 | Paid orders and packages cannot be cancelled yet | `orders/service.ts` | Refunds and cancellations (step 11) |
 | Outbox events are written but not yet delivered | `outbox_events` | Notifications (step 12) |
+| Payouts to sellers' bank accounts are not built; `paidOutPaise` is always 0 | `finance/ledger.ts` | Payouts module |
+| No GST on commission or on the Buyer Protection fee; no GST TCS (section 52) or income-tax TDS (194-O) withheld from sellers | `finance/service.ts` | Confirm with the accountant before launch |
+| Earnings are released 14 days after payment even if the package has not shipped or has an open complaint | `finance/service.ts` | Hold on open returns and disputes (step 11) |
 | Required KYC documents are a default (PAN card, address proof, bank proof, GST certificate if GSTIN given) | `sellers/rules.ts` | Confirm with the business / accountant |
 
 ## Run locally
@@ -79,7 +83,11 @@ limits, admin fee changes, and concurrency on cart size and delivery options; an
 idempotent checkout (replays, reused keys, five parallel checkouts), the total the buyer saw,
 one unpaid order at a time, last-unit and single-use-coupon races, frozen and database-guarded
 amounts, payment confirmation and its repeat, unpaid expiry and late payment, per-customer coupon
-limits, strict fulfilment steps, two sellers shipping at once, and seller/customer/admin access.
+limits, strict fulfilment steps, two sellers shipping at once, and seller/customer/admin access; and
+finance: rule precedence and rounding, rules frozen on orders, overlapping and self-serving rules
+refused, gap-free default changes, balanced and append-only ledger postings, coupon cost on the
+platform, the 14-day hold and its release (once, even when run twice at once), and checkout
+stopping when no commission rule is in force.
 
 All money in the API is integer paise in Indian rupees (INR); prices include GST.
 CI runs them on every push that touches `server/`. To turn CI on, move `server/ci/server-ci.yml` to

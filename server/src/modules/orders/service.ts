@@ -5,6 +5,8 @@ import { AppError, Errors } from "../../lib/errors.js";
 import { CURRENCY } from "../../lib/money.js";
 import * as inv from "../inventory/service.js";
 import * as cart from "../cart/service.js";
+import * as commission from "../finance/commission.js";
+import { postOrderPayment } from "../finance/service.js";
 
 export type Actor = { userId: string | null; role: "customer" | "seller" | "admin" | "system" };
 export type SellerOrderStatus = "pending_payment" | "confirmed" | "processing" | "shipped" | "out_for_delivery" | "delivered" | "cancelled";
@@ -91,6 +93,14 @@ export async function checkout(db: Db, userId: string, input: CheckoutInput, pay
       throw new AppError(409, "TOTAL_CHANGED", "The total changed. Please review your cart.", { totalPaise: q.totalPaise });
     }
 
+    // Commission for every line, from the rules in force right now; frozen on the order.
+    const lines = q.packages.flatMap((p) => p.lines);
+    const rules = await commission.resolve(tx, lines.map((l) => ({ productId: internal.facts.get(l.variantId).product_id, sellerId: l.sellerId, categoryPath: l.categoryPath })));
+    const fee = new Map(lines.map((l, i) => {
+      const c = commission.commissionOn(l.subtotalPaise, rules[i]!.rateBp);
+      return [l.variantId, { rule: rules[i]!, commissionPaise: c, earningPaise: l.subtotalPaise - c }];
+    }));
+
     const orderId = randomUUID();
 
     // Coupon: per-customer limit, first-order rule, and one use from the overall limit.
@@ -112,7 +122,6 @@ export async function checkout(db: Db, userId: string, input: CheckoutInput, pay
     }
 
     // Hold the stock (all-or-nothing; OUT_OF_STOCK rolls everything back).
-    const lines = q.packages.flatMap((p) => p.lines);
     const holds = await inv.reserve(tx, lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
       { ownerUserId: userId, referenceType: "order", referenceId: orderId, ttlMinutes: paymentWindowMinutes });
     const holdByVariant = new Map(holds.map((h) => [h.variantId, h]));
@@ -138,20 +147,27 @@ export async function checkout(db: Db, userId: string, input: CheckoutInput, pay
       const soId = randomUUID();
       const sub = p.lines.reduce((a, l) => a + l.subtotalPaise, 0);
       const disc = p.lines.reduce((a, l) => a + l.discountPaise, 0);
+      const comm = p.lines.reduce((a, l) => a + fee.get(l.variantId)!.commissionPaise, 0);
+      // The seller earns the full item price less commission, plus the delivery fee (they ship it).
       await tx.query(
-        `insert into seller_orders (id, order_id, seller_id, number, items_subtotal_paise, discount_paise, items_net_paise, delivery_code, delivery_label, delivery_paise)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [soId, orderId, p.sellerId, `${number}-${++n}`, sub, disc, p.itemsNetPaise, p.delivery.code, p.delivery.label, p.delivery.feePaise],
+        `insert into seller_orders (id, order_id, seller_id, number, items_subtotal_paise, discount_paise, items_net_paise, delivery_code, delivery_label, delivery_paise,
+                                    commission_paise, seller_earning_paise)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        [soId, orderId, p.sellerId, `${number}-${++n}`, sub, disc, p.itemsNetPaise, p.delivery.code, p.delivery.label, p.delivery.feePaise,
+         comm, sub - comm + p.delivery.feePaise],
       );
       for (const l of p.lines) {
         const f = internal.facts.get(l.variantId);
         const h = holdByVariant.get(l.variantId)!;
+        const c = fee.get(l.variantId)!;
         await tx.query(
           `insert into order_items (order_id, seller_order_id, variant_id, product_id, warehouse_id, reservation_id, title, sku, options,
-                                    unit_price_paise, quantity, subtotal_paise, discount_paise, net_paise, gst_rate_bp, gst_included_paise)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+                                    unit_price_paise, quantity, subtotal_paise, discount_paise, net_paise, gst_rate_bp, gst_included_paise,
+                                    commission_rule_id, commission_rate_bp, commission_paise, seller_earning_paise)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
           [orderId, soId, l.variantId, f.product_id, h.warehouseId, h.id, f.title, f.sku, JSON.stringify(f.options),
-           l.unitPricePaise, l.quantity, l.subtotalPaise, l.discountPaise, l.netPaise, l.gstRateBp, l.gstIncludedPaise],
+           l.unitPricePaise, l.quantity, l.subtotalPaise, l.discountPaise, l.netPaise, l.gstRateBp, l.gstIncludedPaise,
+           c.rule.ruleId, c.rule.rateBp, c.commissionPaise, c.earningPaise],
         );
       }
       await event(tx, soId, null, "pending_payment", { userId, role: "customer" });
@@ -186,6 +202,8 @@ export async function confirmPayment(tx: Tx, orderId: string): Promise<{ already
     await outbox(tx, "seller_order.confirmed", "seller_order", so.id, { sellerId: so.seller_id, orderNumber: o.number });
   }
   await tx.query(`update coupon_redemptions set status = 'confirmed' where order_id = $1`, [orderId]);
+  // Book the money in the ledger in the same transaction: paid and booked, or neither.
+  await postOrderPayment(tx, o);
   // The bought items leave the cart.
   await tx.query(
     `delete from cart_items ci using carts c where ci.cart_id = c.id and c.user_id = $1
@@ -331,12 +349,24 @@ export async function orderDetail(db: Queryable, orderId: string, scope: { userI
       id: so.id, number: so.number, sellerId: so.seller_id, sellerName: so.display_name, status: so.status,
       delivery: { code: so.delivery_code, label: so.delivery_label, feePaise: Number(so.delivery_paise) },
       itemsSubtotalPaise: Number(so.items_subtotal_paise), discountPaise: Number(so.discount_paise), itemsNetPaise: Number(so.items_net_paise),
+      ...(scope.sellerId || scope.admin ? {
+        earnings: {
+          commissionPaise: so.commission_paise === null ? null : Number(so.commission_paise),
+          deliveryFeePaise: Number(so.delivery_paise),
+          sellerEarningPaise: so.seller_earning_paise === null ? null : Number(so.seller_earning_paise),
+          availableAt: so.funds_available_at, releasedAt: so.funds_released_at,
+        },
+      } : {}),
       carrier: so.carrier, trackingNumber: so.tracking_number, confirmedAt: so.confirmed_at, shippedAt: so.shipped_at, deliveredAt: so.delivered_at,
       cancelledAt: so.cancelled_at, cancelReason: so.cancel_reason,
       items: items.filter((i) => i.seller_order_id === so.id).map((i) => ({
         id: i.id, variantId: i.variant_id, productId: i.product_id, title: i.title, sku: i.sku, options: i.options,
         unitPricePaise: Number(i.unit_price_paise), quantity: i.quantity, subtotalPaise: Number(i.subtotal_paise),
         discountPaise: Number(i.discount_paise), netPaise: Number(i.net_paise), gstRateBp: i.gst_rate_bp, gstIncludedPaise: Number(i.gst_included_paise),
+        ...(scope.sellerId || scope.admin ? {
+          commissionRateBp: i.commission_rate_bp, commissionPaise: i.commission_paise === null ? null : Number(i.commission_paise),
+          sellerEarningPaise: i.seller_earning_paise === null ? null : Number(i.seller_earning_paise),
+        } : {}),
       })),
       history: events.filter((e) => e.seller_order_id === so.id).map((e) => ({
         from: e.from_status, to: e.to_status, by: e.actor_role, reason: e.reason, at: e.created_at,

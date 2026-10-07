@@ -3,6 +3,7 @@ import { createPool } from "./lib/db.js";
 import { buildApp } from "./app.js";
 import { expireDue, processSearchQueue } from "./modules/inventory/service.js";
 import { expireUnpaidOrders } from "./modules/orders/service.js";
+import { releaseHeldFunds } from "./modules/finance/service.js";
 
 const cfg = loadConfig();
 const db = createPool(cfg);
@@ -33,6 +34,9 @@ const sweep = setInterval(() => {
     .then(() => expireDue(db))
     .then((n) => { if (n) app.log.info({ released: n }, "expired stock reservations"); })
     .catch((err) => app.log.error({ err }, "reservation sweep failed"))
+    .then(() => releaseHeldFunds(db))
+    .then((n) => { if (n) app.log.info({ released: n }, "seller earnings moved from on hold to available"); })
+    .catch((err) => app.log.error({ err }, "earnings release sweep failed"))
     .then(() => processSearchQueue(db))
     .then((n) => { if (n) app.log.info({ refreshed: n }, "search refresh queue processed"); })
     .catch((err) => app.log.error({ err }, "search refresh sweep failed"))

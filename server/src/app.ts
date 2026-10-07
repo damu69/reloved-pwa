@@ -11,6 +11,7 @@ import { AppError } from "./lib/errors.js";
 import { authRoutes, meRoutes } from "./modules/auth/routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
 import { adminSellerRoutes, sellerRoutes } from "./modules/sellers/routes.js";
+import { adminCatalogueRoutes, publicCatalogueRoutes, sellerCatalogueRoutes } from "./modules/catalogue/routes.js";
 import { createFieldCipher, type FieldCipher } from "./lib/encryption.js";
 import { createStorage, type Storage } from "./lib/storage.js";
 
@@ -41,6 +42,7 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
   app.decorate("cipher", createFieldCipher(cfg));
   app.decorate("storage", overrides.storage ?? createStorage(cfg));
   app.decorateRequest("auth", null);
+  app.decorateRequest("seller", null);
 
   await app.register(helmet, {
     contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
@@ -55,7 +57,7 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
   });
   await app.register(cookie);
   // Only the document upload route reads multipart; limits are tightened again there.
-  await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 0, parts: 2, headerPairs: 50 } });
+  await app.register(multipart, { limits: { fileSize: 8 * 1024 * 1024, files: 1, fields: 0, parts: 2, headerPairs: 50 } });
   // In-memory limits are per instance. TODO before running several instances: Redis store.
   await app.register(rateLimit, {
     global: true,
@@ -72,7 +74,8 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
 
   app.addHook("onSend", async (req, reply) => {
     reply.header("x-request-id", req.id);
-    reply.header("cache-control", "no-store");
+    // Default: never cache API responses. Routes that serve public media set their own policy.
+    if (!reply.hasHeader("cache-control")) reply.header("cache-control", "no-store");
   });
 
   app.setNotFoundHandler((req, reply) => {
@@ -114,6 +117,9 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
     await v1.register(adminRoutes, { prefix: "/admin" });
     await v1.register(sellerRoutes, { prefix: "/seller" });
     await v1.register(adminSellerRoutes, { prefix: "/admin/sellers" });
+    await v1.register(sellerCatalogueRoutes, { prefix: "/seller/products" });
+    await v1.register(adminCatalogueRoutes, { prefix: "/admin/catalogue" });
+    await v1.register(publicCatalogueRoutes, { prefix: "/catalogue" });
   }, { prefix: "/api/v1" });
 
   return app;

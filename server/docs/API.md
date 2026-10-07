@@ -14,11 +14,11 @@ Base path `/api/v1`. JSON only. Every response carries an `x-request-id` header.
 | --- | --- |
 | 400 | `VALIDATION_FAILED`, `BAD_REQUEST`, `INVALID_TOKEN` |
 | 401 | `UNAUTHENTICATED`, `SESSION_EXPIRED`, `INVALID_CREDENTIALS` |
-| 403 | `FORBIDDEN`, `ACCOUNT_SUSPENDED` |
+| 403 | `FORBIDDEN`, `ACCOUNT_SUSPENDED`, `NOT_A_SELLER`, `SELLER_NOT_APPROVED`, `SELLER_SUSPENDED` |
 | 404 | `NOT_FOUND` (also used for records you may not see, so ids cannot be probed) |
-| 409 | `ACCOUNT_EXISTS`, `LAST_ADMIN`, `APPLICATION_EXISTS`, `STORE_NAME_TAKEN`, `GSTIN_IN_USE`, `TOO_MANY_DOCUMENTS` |
+| 409 | `ACCOUNT_EXISTS`, `LAST_ADMIN`, `APPLICATION_EXISTS`, `STORE_NAME_TAKEN`, `GSTIN_IN_USE`, `TOO_MANY_DOCUMENTS`, `SKU_TAKEN`, `VARIANT_EXISTS`, `TOO_MANY_IMAGES`, `CATEGORY_EXISTS`, `CATEGORY_HAS_PRODUCTS`, `CATEGORY_HAS_CHILDREN`, `BRAND_EXISTS`, `REVISION_CHANGED`, `PRODUCT_CHANGED` |
 | 413 / 415 | `FILE_TOO_LARGE` / `UNSUPPORTED_FILE_TYPE` |
-| 422 | `INVALID_TRANSITION`, `APPLICATION_INCOMPLETE`, `DOCUMENTS_NOT_ACCEPTED`, `BANK_ACCOUNT_MISSING`, `BANK_PROOF_REQUIRED` |
+| 422 | `INVALID_TRANSITION`, `PRODUCT_INCOMPLETE`, `INVALID_IMAGE`, `APPLICATION_INCOMPLETE`, `DOCUMENTS_NOT_ACCEPTED`, `BANK_ACCOUNT_MISSING`, `BANK_PROOF_REQUIRED` |
 | 429 | `RATE_LIMITED` |
 | 500 | `INTERNAL` (no internal details; quote the requestId to support) |
 
@@ -95,6 +95,57 @@ or `rejected`. Approved sellers can be `suspended` and `reinstated`. The `seller
 | `POST /admin/sellers/:id/bank-accounts/:bankId/review` | `admin.sellers.manage` | After approval only; verifying needs an accepted bank proof uploaded after the account was entered |
 
 Admins can never act on their own seller account (403). Every action is in the audit log and the seller's status history.
+
+## Catalogue: seller (approved sellers only, own products only)
+
+Money is in paise (integers). Prices include GST; each product has a GST rate in basis points (500 = 5%).
+Status flow: `draft` → `pending` (submit) → `active` (admin) or `rejected`. `active` ↔ `archived` (seller).
+Admins can `block` (hidden and locked) and `unblock` (returns as archived or draft).
+
+| Method and path | Notes |
+| --- | --- |
+| `GET /seller/products?status&limit&cursor` | Your products, with `hasPendingChange` |
+| `POST /seller/products` | `title`, `description?`, `categoryId` (a leaf category), `brandId?`, `condition` (`new_with_tags`, `new`, `very_good`, `good`, `satisfactory`), `attributes?` (up to 20 key/values), `gstRateBp`, `hsnCode?` |
+| `GET /seller/products/:id` | Includes variants, photos with status, `pendingChange` and `lastChangeReview` |
+| `PATCH /seller/products/:id` | Draft or rejected: applied at once. Active or archived: saved as the pending change (`changeMode: pending_review`); the live version keeps selling. Pending or blocked: 422 |
+| `POST /seller/products/:id/submit`, `/withdraw`, `/archive`, `/unarchive` | Submit needs at least one photo and one active variant |
+| `DELETE /seller/products/:id` | Only never-published drafts; published products are archived instead |
+| `DELETE /seller/products/:id/pending-change` | Discard your pending change and its photo changes |
+| `POST /seller/products/:id/variants` | `sku` (unique per seller), `options` (same keys on every variant, e.g. `{ "size": "M" }`), `pricePaise`, `mrpPaise` (≥ price) |
+| `PATCH /seller/products/:id/variants/:variantId` | `sku`, `options`, `pricePaise`, `mrpPaise`, `isActive`. Applied at once; audited with old and new values |
+| `DELETE /seller/products/:id/variants/:variantId` | Never-published products only; otherwise set `isActive: false` |
+| `POST /seller/products/:id/images` | multipart, one `file`: JPEG, PNG or WebP, up to 8 MB, at least 300 px, up to 10 per product. Stored as WebP at 200, 600 and 1200 px with metadata removed. On a live product the photo waits in the pending change |
+| `DELETE /seller/products/:id/images/:imageId` | On a live product the removal waits in the pending change |
+| `GET /seller/products/:id/images/:imageId/:size` | Preview, including photos waiting for review |
+
+## Catalogue: admin
+
+| Method and path | Permission | Notes |
+| --- | --- | --- |
+| `POST /admin/catalogue/categories` | `admin.catalogue.manage` | `name`, `slug?`, `parentId?`, `sortOrder?`. Max 5 levels; a category with products cannot get children |
+| `PATCH /admin/catalogue/categories/:id` | `admin.catalogue.manage` | `name`, `sortOrder`, `isActive`. Slugs never change |
+| `POST /admin/catalogue/brands`, `PATCH /admin/catalogue/brands/:id` | `admin.catalogue.manage` | |
+| `POST /admin/catalogue/gst-rates`, `PATCH /admin/catalogue/gst-rates/:rateBp` | `admin.catalogue.manage` | |
+| `GET /admin/catalogue/products?status&sellerId` | `admin.products.review` | Review queue |
+| `GET /admin/catalogue/pending-changes` | `admin.products.review` | Edits to live products waiting for review |
+| `GET /admin/catalogue/products/:id` | `admin.products.review` | Includes `submission` and `pendingChange.version` |
+| `POST /admin/catalogue/products/:id/approve`, `/reject` | `admin.products.review` | Body `{ submission, reason? }` (reason required to reject). 409 `PRODUCT_CHANGED` if it was resubmitted since you opened it |
+| `POST /admin/catalogue/products/:id/block`, `/unblock` | `admin.products.review` | `{ reason }` required |
+| `POST /admin/catalogue/products/:id/pending-change/approve`, `/reject` | `admin.products.review` | Body `{ version, reason? }`. 409 `REVISION_CHANGED` if the seller edited it since you opened it |
+| `GET /admin/catalogue/products/:id/images/:imageId/:size` | `admin.products.review` | Preview including pending photos |
+
+Admins cannot approve or reject their own products.
+
+## Catalogue: public (no sign-in)
+
+Only live products of approved sellers in active categories with at least one active variant are shown.
+
+| Method and path | Notes |
+| --- | --- |
+| `GET /catalogue/categories`, `/catalogue/brands`, `/catalogue/gst-rates` | |
+| `GET /catalogue/products?category=women/tops&brand=zara&sellerId&limit&cursor` | Newest first; `category` includes its subcategories |
+| `GET /catalogue/products/:id` | Live content, active variants, live photos |
+| `GET /catalogue/media/products/:id/:imageId/:size` | `size` 200, 600 or 1200; WebP; cached for 1 hour |
 
 ## Health
 

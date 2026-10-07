@@ -11,7 +11,8 @@ it module by module.
 | 1 | Scaffold: config, logging, error format, migrations, health checks, CI | Done |
 | 2 | Auth, roles, permissions, sessions, audit log, admin user management | Done |
 | 3 | Seller applications, KYC documents, bank accounts, admin review | Done |
-| 4 | Catalogue: categories, products, variants, images, approval | Next |
+| 4 | Catalogue: categories, brands, GST rates, products, variants, photos, review of new products and of edits to live ones | Done |
+| 5 | Search and filters | Next |
 | 4+ | Catalogue, search, inventory, cart, checkout, ledger, payments (MOCK), refunds, notifications, dashboards | Planned |
 
 The existing PWA at the repo root still talks to Supabase directly. It moves to this API
@@ -24,6 +25,10 @@ module by module; nothing in the live app changes yet.
 | Password-reset token returned in the API response | `DEV_EXPOSE_RESET_TOKEN`, `auth/service.ts` | Email via the notification module. The server refuses to start in production with this on. |
 | In-memory rate limits | `app.ts`, `lib/limiter.ts` | Redis store, once more than one API instance runs |
 | Supabase Storage driver not yet run against a live project | `lib/storage.ts` | Verify on staging with a private bucket before go-live |
+| Photos are processed during the upload request | `lib/images.ts` | Background job queue (Redis + BullMQ) when upload volume grows |
+| Photos are served by the API with a 1-hour cache | `catalogue/routes.ts` | A CDN in front of storage |
+| Files of removed photos and documents stay in storage | `catalogue/products.ts`, `sellers/service.ts` | A cleanup job |
+| GST rates seeded as 0, 3, 5, 18, 40% | `migrations/0003_catalogue.sql` | Confirm with the accountant; admins can add or disable rates |
 | Required KYC documents are a default (PAN card, address proof, bank proof, GST certificate if GSTIN given) | `sellers/rules.ts` | Confirm with the business / accountant |
 
 ## Run locally
@@ -50,7 +55,10 @@ escalation, admin self-protection, suspension revoking live tokens, cursor pagin
 append-only audit log, error formats, production config refusals, and the seller flow: application
 validation, encrypted PAN and bank numbers, upload type and size checks, document access control,
 submission locking, document review, approval races, re-review after edits, role sync on suspend,
-bank account changes after approval, and self-review protection.
+bank account changes after approval, and self-review protection; and the catalogue: leaf categories,
+GST rates, SKU and option rules, photo type, size, metadata stripping and caps, cross-seller access,
+submission and review, edits to live products waiting as versioned pending changes, stale approvals,
+instant audited price changes, archive, block, seller suspension and public visibility.
 CI runs them on every push that touches `server/`. To turn CI on, move `server/ci/server-ci.yml` to
 `.github/workflows/server-ci.yml` (in File Explorer or on github.com) and commit it.
 

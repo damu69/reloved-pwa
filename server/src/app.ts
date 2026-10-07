@@ -16,6 +16,7 @@ import { createFieldCipher, type FieldCipher } from "./lib/encryption.js";
 import { createStorage, type Storage } from "./lib/storage.js";
 import { PostgresSearch, type SearchService } from "./modules/search/service.js";
 import { adminInventoryRoutes, sellerInventoryRoutes } from "./modules/inventory/routes.js";
+import { adminCouponRoutes, adminPricingRoutes, cartRoutes, wishlistRoutes } from "./modules/cart/routes.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -131,6 +132,10 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
     await v1.register(publicCatalogueRoutes, { prefix: "/catalogue" });
     await v1.register(sellerInventoryRoutes, { prefix: "/seller/inventory" });
     await v1.register(adminInventoryRoutes, { prefix: "/admin/inventory" });
+    await v1.register(cartRoutes, { prefix: "/cart" });
+    await v1.register(wishlistRoutes, { prefix: "/me/wishlist" });
+    await v1.register(adminCouponRoutes, { prefix: "/admin/coupons" });
+    await v1.register(adminPricingRoutes, { prefix: "/admin/pricing" });
   }, { prefix: "/api/v1" });
 
   return app;

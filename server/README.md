@@ -14,7 +14,8 @@ it module by module.
 | 4 | Catalogue: categories, brands, GST rates, products, variants, photos, review of new products and of edits to live ones | Done |
 | 5 | Search: full text with typo tolerance (English and Indian scripts), filters, sorting, cursor pagination | Done |
 | 6 | Inventory: warehouses, stock counters, checkout holds that expire, no overselling, stock history, availability in search | Done |
-| 7 | Cart and coupons | Next |
+| 7 | Cart, pricing engine, coupons, wishlist, admin fee settings | Done |
+| 8 | Checkout and multi-seller orders | Next |
 | 4+ | Catalogue, search, inventory, cart, checkout, ledger, payments (MOCK), refunds, notifications, dashboards | Planned |
 
 The existing PWA at the repo root still talks to Supabase directly. It moves to this API
@@ -33,6 +34,8 @@ module by module; nothing in the live app changes yet.
 | Photos are served by the API with a 1-hour cache | `catalogue/routes.ts` | A CDN in front of storage |
 | Files of removed photos and documents stay in storage | `catalogue/products.ts`, `sellers/service.ts` | A cleanup job |
 | GST rates seeded as 0, 3, 5, 18, 40% | `migrations/0003_catalogue.sql` | Confirm with the accountant; admins can add or disable rates |
+| Coupon per-user limits and first-order-only are stored but enforced at checkout | `cart/service.ts` | Step 8 (checkout) |
+| A coupon scoped to categories and sellers applies to items matching both (AND) | `cart/pricing.ts` | Confirm with the business |
 | Required KYC documents are a default (PAN card, address proof, bank proof, GST certificate if GSTIN given) | `sellers/rules.ts` | Confirm with the business / accountant |
 
 ## Run locally
@@ -67,7 +70,10 @@ matching across fields, Hindi text, typos, unsafe input, filters, every sort ord
 microsecond timestamps, concurrent edits and suspensions, and 10,000-product timings; and inventory:
 50 buyers for the last unit, 30 buyers for 10 units, crossed-order checkouts without deadlocks,
 expiry sweeps running in parallel, late payments after expiry, stale exact counts, returns and
-restocking, warehouse switches, append-only stock history, and admin adjustments.
+restocking, warehouse switches, append-only stock history, and admin adjustments; and the cart:
+the pricing engine (2,000 random orders always add up), per-seller delivery, Buyer Protection once
+per order, coupon scope, caps, minimums, expiry and limits, live price and stock re-checks, guessing
+limits, admin fee changes, and concurrency on cart size and delivery options.
 
 All money in the API is integer paise in Indian rupees (INR); prices include GST.
 CI runs them on every push that touches `server/`. To turn CI on, move `server/ci/server-ci.yml` to

@@ -16,11 +16,11 @@ responses carry `currency: "INR"`.
 | --- | --- |
 | 400 | `VALIDATION_FAILED`, `BAD_REQUEST`, `INVALID_TOKEN` |
 | 401 | `UNAUTHENTICATED`, `SESSION_EXPIRED`, `INVALID_CREDENTIALS` |
-| 403 | `FORBIDDEN`, `ACCOUNT_SUSPENDED`, `NOT_A_SELLER`, `SELLER_NOT_APPROVED`, `SELLER_SUSPENDED` |
+| 403 | `OWN_PRODUCT`, `FORBIDDEN`, `ACCOUNT_SUSPENDED`, `NOT_A_SELLER`, `SELLER_NOT_APPROVED`, `SELLER_SUSPENDED` |
 | 404 | `NOT_FOUND` (also used for records you may not see, so ids cannot be probed) |
-| 409 | `INSUFFICIENT_STOCK`, `OUT_OF_STOCK`, `STOCK_CHANGED`, `STOCK_BELOW_RESERVED`, `WAREHOUSE_EXISTS`, `ACCOUNT_EXISTS`, `LAST_ADMIN`, `APPLICATION_EXISTS`, `STORE_NAME_TAKEN`, `GSTIN_IN_USE`, `TOO_MANY_DOCUMENTS`, `SKU_TAKEN`, `VARIANT_EXISTS`, `TOO_MANY_IMAGES`, `CATEGORY_EXISTS`, `CATEGORY_HAS_PRODUCTS`, `CATEGORY_HAS_CHILDREN`, `BRAND_EXISTS`, `REVISION_CHANGED`, `PRODUCT_CHANGED` |
+| 409 | `ONLY_N_LEFT`, `CART_FULL`, `COUPON_EXISTS`, `WISHLIST_FULL`, `INSUFFICIENT_STOCK`, `OUT_OF_STOCK`, `STOCK_CHANGED`, `STOCK_BELOW_RESERVED`, `WAREHOUSE_EXISTS`, `ACCOUNT_EXISTS`, `LAST_ADMIN`, `APPLICATION_EXISTS`, `STORE_NAME_TAKEN`, `GSTIN_IN_USE`, `TOO_MANY_DOCUMENTS`, `SKU_TAKEN`, `VARIANT_EXISTS`, `TOO_MANY_IMAGES`, `CATEGORY_EXISTS`, `CATEGORY_HAS_PRODUCTS`, `CATEGORY_HAS_CHILDREN`, `BRAND_EXISTS`, `REVISION_CHANGED`, `PRODUCT_CHANGED` |
 | 413 / 415 | `FILE_TOO_LARGE` / `UNSUPPORTED_FILE_TYPE` |
-| 422 | `STOCK_LIMIT`, `INVALID_TRANSITION`, `PRODUCT_INCOMPLETE`, `INVALID_IMAGE`, `APPLICATION_INCOMPLETE`, `DOCUMENTS_NOT_ACCEPTED`, `BANK_ACCOUNT_MISSING`, `BANK_PROOF_REQUIRED` |
+| 422 | `COUPON_INVALID`, `COUPON_NOT_APPLICABLE`, `STOCK_LIMIT`, `INVALID_TRANSITION`, `PRODUCT_INCOMPLETE`, `INVALID_IMAGE`, `APPLICATION_INCOMPLETE`, `DOCUMENTS_NOT_ACCEPTED`, `BANK_ACCOUNT_MISSING`, `BANK_PROOF_REQUIRED` |
 | 429 | `RATE_LIMITED` |
 | 503 | `TRY_AGAIN` (two changes collided; nothing was saved; retry) |
 | 500 | `INTERNAL` (no internal details; quote the requestId to support) |
@@ -180,6 +180,42 @@ Every change is kept in an append-only movement history.
 Search hides sold-out products unless `includeOutOfStock=true`; results carry `inStock`. On the
 product page each variant has `inStock` and `onlyLeft` (a number when 3 or fewer can be bought,
 otherwise null). Exact stock counts are never published.
+
+## Cart (signed-in buyers)
+
+The cart stores quantities only. Every response is a fresh quote from live prices, stock and the
+coupon, using the same pricing as checkout. Adding to the cart never holds stock.
+Pricing rules: prices include GST; delivery per seller package (default Home ₹99, Pickup ₹59, Meet
+free); Buyer Protection once per order (default ₹15 + 5% of items after discount); one coupon per
+order, funded by the platform, spread over eligible items in proportion to their price.
+
+| Method and path | Notes |
+| --- | --- |
+| `GET /cart` | `items` (each with live price, discount, net, GST included and `problems`), `packages` (one per seller with delivery and `deliveryChoices`), `coupon`, `totals`, `canCheckout` |
+| `PUT /cart/items/:variantId` | `{ quantity }` (0 removes). 409 `ONLY_N_LEFT` / `OUT_OF_STOCK` with `available`; 403 `OWN_PRODUCT`; 409 `CART_FULL` |
+| `DELETE /cart/items/:variantId` | |
+| `PUT /cart/delivery/:sellerId` | `{ code }` for that seller's package |
+| `POST /cart/coupon` | `{ code }`, case-insensitive. Replaces any earlier code; a code that does not fit keeps the earlier one. 422 `COUPON_INVALID` or `COUPON_NOT_APPLICABLE` (with `shortfallPaise` for minimum-order codes). Limited to 10 tries per account and 30 per IP per 15 minutes |
+| `DELETE /cart/coupon`, `DELETE /cart` | |
+
+Line problems: `NOT_AVAILABLE`, `OWN_PRODUCT`, `OUT_OF_STOCK`, `ONLY_N_LEFT`, `QUANTITY_LIMIT`,
+`CART_TOO_LARGE` (these block checkout and are left out of the totals) and `PRICE_CHANGED`
+(information only; the current price is what is charged).
+
+## Wishlist (signed-in)
+
+`GET /me/wishlist` (live products only), `PUT /me/wishlist/:productId`, `DELETE /me/wishlist/:productId`.
+
+## Admin: coupons and fees
+
+| Method and path | Permission | Notes |
+| --- | --- | --- |
+| `POST /admin/coupons` | `admin.coupons.manage` | `code`, `discountType` (`percent` with `percentBp` and optional `maxDiscountPaise`, or `fixed` with `amountPaise`), `minOrderPaise`, `categoryIds`, `sellerIds` (both given: items must match both), `startsAt`, `endsAt`, `usageLimit`, `perUserLimit`, `firstOrderOnly`, `description` |
+| `GET /admin/coupons`, `GET /admin/coupons/:id` | `admin.coupons.manage` | With `usedCount` and `state` |
+| `PATCH /admin/coupons/:id` | `admin.coupons.manage` | Any field except code and type; `isActive` to switch off. Audited with old and new values |
+| `GET /admin/pricing` | `admin.pricing.manage` | Settings and delivery options |
+| `PATCH /admin/pricing/settings` | `admin.pricing.manage` | `buyerFeeFixedPaise`, `buyerFeeBp`, `maxCartLines`, `maxLineQuantity`. Audited |
+| `PUT /admin/pricing/delivery-options/:code` | `admin.pricing.manage` | `label`, `feePaise`, `isActive`, `sortOrder`. At least one stays active. Audited |
 
 ## Health
 

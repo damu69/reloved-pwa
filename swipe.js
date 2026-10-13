@@ -274,9 +274,11 @@ V.chat = function (id) {
   var c = CH.conv;
   return head(esc(c.otherName), true) +
     '<button class="itemcard" data-a="item" data-i="' + esc(c.productId) + '">' + ph(c.productTitle, c.productId, c.coverImageId, 200) + '<span style="flex:1;min-width:0"><b class="clip">' + esc(c.productTitle) + '</b><span class="muted small clip">' + (c.role === "buyer" ? "You are asking about this item" : "Asking about this item") + '</span></span><span class="chev"></span></button>' +
+    '<div class="chat-safe"><button data-a="go" data-i="report" data-j="conversation:' + esc(c.id) + '">Report</button><button data-a="chatblock">Block ' + esc(c.otherName) + '</button></div>' +
     '<div class="msgs" id="msgs">' + bubbles() + "</div>" +
     '<form class="composer" id="chatf"><textarea class="inp" id="chat_in" rows="1" maxlength="1000" placeholder="Write a message" aria-label="Message">' + esc(CH.draft) + '</textarea><button class="btn" type="submit"' + (CH.sending ? " disabled" : "") + ">Send</button></form>";
 };
+A.chatblock = async function () { if (!CH.conv || !CH.conv.otherUserId) return; await A.blockuser(CH.conv.otherUserId); };
 A.chatretry = function () { var id = CH.id; CH = { id: null }; R.replace("chat", id); };
 R.hooks.push(function () {
   if (R.current().v === "chat" && CH.loaded) { var m = $("main"); if (m && !CH.shown) { m.scrollTop = m.scrollHeight; } CH.shown = true; }
@@ -324,7 +326,7 @@ setInterval(function () {
     var c = R.need("chats", function () { return api.get("/chat/conversations"); });
     if (c.st === "ok") api.get("/chat/conversations").then(function (r) { c.data = r; if (R.current().v === "inbox") R.refresh(); }, function () { });
   }
-  if (tickN % 5 === 0) pollUnread();
+  if (tickN % 3 === 0) pollUnread();
 }, 4000);
 document.addEventListener("visibilitychange", function () { if (!document.hidden) pollUnread(); });
 R.hooks.push(function () { if (R.signedIn() && S.unread === undefined) { S.unread = 0; pollUnread(); } });

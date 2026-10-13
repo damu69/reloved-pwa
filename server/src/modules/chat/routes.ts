@@ -4,6 +4,7 @@ import { parse, uuid } from "../../lib/validate.js";
 import { Errors } from "../../lib/errors.js";
 import { withTx, type Queryable } from "../../lib/db.js";
 import { windowLimiter } from "../../lib/limiter.js";
+import { blockedEitherWay } from "../safety/routes.js";
 import { authenticate } from "../auth/guard.js";
 
 // Plain text only. Line breaks are kept; other control characters (null bytes and so on) are refused.
@@ -18,6 +19,7 @@ const preview = (s: string) => s.replace(/\s+/g, " ").slice(0, 140);
 const SUMMARY = `
   select c.id, c.product_id, c.last_message_at, c.last_message_preview,
          (c.buyer_id = $1) as is_buyer,
+         case when c.buyer_id = $1 then c.seller_user_id else c.buyer_id end as other_user_id,
          p.title as product_title,
          case when c.buyer_id = $1 then s.display_name::text else split_part(u.full_name, ' ', 1) end as other_name,
          (select pi.id from product_images pi where pi.product_id = p.id and pi.status in ('active', 'pending_remove')
@@ -32,7 +34,7 @@ const SUMMARY = `
 
 const summaryOut = (r: any) => ({
   id: r.id, productId: r.product_id, productTitle: r.product_title, coverImageId: r.cover_image_id,
-  role: r.is_buyer ? "buyer" : "seller", otherName: r.other_name,
+  role: r.is_buyer ? "buyer" : "seller", otherName: r.other_name, otherUserId: r.other_user_id,
   lastMessageAt: r.last_message_at, lastMessagePreview: r.last_message_preview, unread: r.unread,
 });
 
@@ -80,6 +82,7 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
       if (!p.rowCount) throw Errors.notFound("Item");
       const prod = p.rows[0];
       if (prod.seller_user_id === uid(req)) throw Errors.conflict("OWN_PRODUCT", "This is your own listing.");
+      if (await blockedEitherWay(tx, uid(req), prod.seller_user_id)) throw Errors.conflict("USER_BLOCKED", "You can't message this seller.");
       const ins = await tx.query(
         `insert into conversations (product_id, buyer_id, seller_id, seller_user_id) values ($1, $2, $3, $4)
          on conflict (buyer_id, product_id) do nothing returning id`,
@@ -126,6 +129,8 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
       const c = await tx.query(`select buyer_id, seller_user_id from conversations where id = $1 for update`, [id]);
       const row = c.rows[0];
       if (!row || (row.buyer_id !== uid(req) && row.seller_user_id !== uid(req))) throw Errors.notFound("Conversation");
+      const other = row.buyer_id === uid(req) ? row.seller_user_id : row.buyer_id;
+      if (await blockedEitherWay(tx, uid(req), other)) throw Errors.conflict("USER_BLOCKED", "You can't message this user.");
       const ins = await tx.query(`insert into messages (conversation_id, sender_id, body) values ($1, $2, $3) returning id, created_at`, [id, uid(req), b.body]);
       const col = row.buyer_id === uid(req) ? "buyer_last_read_id" : "seller_last_read_id";
       await tx.query(`update conversations set last_message_at = $2, last_message_preview = $3, ${col} = $4 where id = $1`, [id, ins.rows[0].created_at, preview(b.body), ins.rows[0].id]);

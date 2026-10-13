@@ -250,7 +250,7 @@ V.item = function (pid) {
     (p.seller ? '<button class="itemcard" data-a="seller" data-i="' + esc(p.seller.id) + '" data-j="' + esc(p.seller.displayName) + '" style="margin:12px 0"><span class="av" style="background:hsl(' + hueOf(p.seller.displayName) + ',40%,32%)">' + esc(String(p.seller.displayName).slice(0, 1).toUpperCase()) + '</span><span style="flex:1"><b>' + esc(p.seller.displayName) + '</b><br><span class="muted small">See more from this seller</span></span><span class="chev"></span></button>' : "") +
     '<button class="btn ghost block" data-a="msgseller" data-i="' + esc(pid) + '" style="margin-bottom:10px">Message seller</button>' +
     (v && v.inStock ? (inCart ? '<div class="two"><button class="btn ghost" data-a="tab" data-i="cart">View cart (' + inCart.quantity + ')</button><button class="btn" data-a="addcart" data-i="' + esc(v.id) + '">Add one more</button></div>' : '<button class="btn block" data-a="addcart" data-i="' + esc(v.id) + '"' + (UI.busy ? " disabled" : "") + ">Add to cart</button>") : '<div class="banner">This option is sold out.</div>') +
-    '<p class="muted small" style="margin-top:10px">Buyer Protection and delivery fees are added at checkout.</p></div></div>';
+    '<p class="muted small" style="margin-top:10px">Buyer Protection and delivery fees are added at checkout.</p><p style="margin-top:6px"><button class="small muted" style="text-decoration:underline" data-a="reportitem" data-i="' + esc(pid) + '">Report this listing</button></p></div></div>';
 };
 function probText(p) {
   var code = p && (p.code || p), n = p && (p.available != null ? p.available : p.left);
@@ -289,7 +289,7 @@ V.auth = function () {
     (reg ? '<label class="field"><span>Phone (optional)</span><input class="inp" id="aph" inputmode="tel" autocomplete="tel"></label>' : "") +
     '<p class="bad small" id="aerr">' + esc(A.err) + '</p><button class="btn block" type="submit"' + (A.busy ? " disabled" : "") + ">" + (A.busy ? "Please wait…" : reg ? "Create account" : "Sign in") + "</button></form>" +
     '<div class="two"><button class="btn ghost" data-a="authmode" data-i="' + (reg ? "login" : "register") + '">' + (reg ? "I have an account" : "Create account") + "</button></div>" +
-    (reg ? "" : '<p class="muted small" style="margin-top:12px">Forgot your password? Password reset by email is not available yet.</p>') + "</div>";
+    (reg ? "" : '<p style="margin-top:12px"><button class="small" style="color:var(--accent);text-decoration:underline" data-a="go" data-i="forgot">Forgot your password?</button></p>') + "</div>";
 };
 V.checkout = function () {
   if (!signedIn()) return V.gate("Checkout", "Sign in to check out.");
@@ -384,7 +384,8 @@ V.settings = function () {
   var u = S.user;
   return head("Settings", true) + '<label class="field"><span>Full name</span><input class="inp" id="setn" maxlength="80" value="' + esc(u.fullName || "") + '"></label><button class="btn block" data-a="savename">Save name</button>' +
     '<h3 style="margin:18px 0 6px">Change password</h3><label class="field"><span>Current password</span><input class="inp" id="pw0" type="password" autocomplete="current-password"></label><label class="field"><span>New password (at least 10 characters)</span><input class="inp" id="pw1" type="password" autocomplete="new-password"></label><button class="btn ghost block" data-a="savepw">Change password</button>' +
-    '<div class="list" style="margin-top:18px">' + row("T", "Light / dark theme", "", 'data-a="theme"') + row("+", "Install app", "", 'data-a="install"') + row("O", "Sign out", "", 'data-a="signout"') + row("X", "Sign out everywhere", "", 'data-a="signoutall"') + "</div>";
+    '<div class="list" style="margin-top:18px">' + row("T", "Light / dark theme", "", 'data-a="theme"') + row("+", "Install app", "", 'data-a="install"') + row("O", "Sign out", "", 'data-a="signout"') + row("X", "Sign out everywhere", "", 'data-a="signoutall"') + "</div>" +
+    '<div class="list" style="margin-top:14px">' + row("B", "Blocked users", "", 'data-a="go" data-i="blocked"') + row("!", "Delete my account", "", 'data-a="go" data-i="delacct"') + "</div>";
 };
 var DOCS = {
   how: ["How it works", "Browse or search for items and add what you like to your cart. At checkout choose a delivery address and place the order. Buyer Protection is added to every order. Sellers pack and ship their own items, and you can follow each package on the order page. If something arrives damaged or fake you can ask for a return within 7 days of delivery."],
@@ -398,7 +399,7 @@ V.help = function () {
   return head("Help Centre", true) + '<div class="list">' + q.map(function (x) { return '<div class="row" style="display:block"><b>' + x[0] + '</b><br><span class="muted">' + x[1] + "</span></div>"; }).join("") + "</div>";
 };
 V.about = function () { return head("About", true) + '<div class="list">' + [["Our platform", "platform"], ["How it works", "how"], ["Trust and Safety", "trust"]].map(function (t) { return row("i", t[0], "", 'data-a="go" data-i="doc" data-j="' + t[1] + '"'); }).join("") + "</div>"; };
-V.legal = function () { return head("Terms &amp; legal", true) + '<div class="list">' + row("§", "User Terms and Conditions", "", 'data-a="go" data-i="tc"') + row("§", "Privacy Centre", "", 'data-a="go" data-i="doc" data-j="privacy"') + "</div>"; };
+V.legal = function () { return head("Terms &amp; legal", true) + '<div class="list">' + row("§", "User Terms and Conditions", "", 'data-a="go" data-i="tc"') + row("§", "Privacy Centre", "", 'data-a="go" data-i="doc" data-j="privacy"') + '<a class="row" href="/privacy.html" target="_blank" rel="noopener"><span class="ic">§</span><span class="l">Full Privacy Policy</span><span class="chev"></span></a><a class="row" href="/terms.html" target="_blank" rel="noopener"><span class="ic">§</span><span class="l">Terms of Use</span><span class="chev"></span></a>' + "</div>"; };
 V.tc = function () {
   return head("User Terms and Conditions", true) + '<div class="doc"><h3>1. About you and us</h3><p>Who runs the service and what the defined terms mean.</p><h3>2. Your account</h3><p>Keep your account secure and report unauthorised use. Members must be 18 or over.</p><h3>3. Buying</h3><p>Prices include GST. Delivery and Buyer Protection fees are shown before you order. Pay only through the app to keep Buyer Protection.</p><h3>4. Selling</h3><p>Sellers are verified before they can sell. List only items you own and describe them honestly. Counterfeit, illegal or unsafe items are not allowed.</p><h3>5. Cancellations and returns</h3><p>A paid package can be cancelled until it ships. Returns are accepted within 7 days of delivery for damaged or fake items only.</p><p class="small">Summary for the trial. Not legal advice.</p></div>';
 };
@@ -611,7 +612,7 @@ async function boot() {
   S.ready = true; render(); loadFeed(false);
 }
 window.RL = { V: V, A: {}, E: {}, PCAT: PCAT, paintNav: renderNav, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
-  current: function () { return cur(); }, replace: function (v, p) { stack.pop(); go(v, p); } };
+  current: function () { return cur(); }, canBack: function () { return stack.length > 0; }, replace: function (v, p) { stack.pop(); go(v, p); } };
 boot();
 window.__reloved = { S: S, UI: UI };
 })();

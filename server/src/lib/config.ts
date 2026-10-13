@@ -43,6 +43,10 @@ const schema = z.object({
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   // MOCK / TEMPORARY: returns the password-reset token in the API response because no email
   // provider exists yet. Must be false in production; startup refuses otherwise.
+  // Email through Resend. Both unset = email is only logged. APP_URL is the public site, used in links inside emails.
+  RESEND_API_KEY: z.string().min(10).optional(),
+  EMAIL_FROM: z.string().min(5).optional(),
+  APP_URL: z.string().url().default("http://localhost:5173"),
   DEV_EXPOSE_RESET_TOKEN: z.enum(["true", "false"]).default("false"),
   // Payment provider. none (default): checkout works but orders cannot be paid (they expire).
   // mock: a fake provider for development and tests, only when set explicitly; refused in production,

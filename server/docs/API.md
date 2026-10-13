@@ -393,6 +393,19 @@ Limits: 40 messages a minute, 40 new conversations an hour.
 | `GET /chat/conversations/:id/messages?after=` | Messages in order; `after` returns only newer ones (used for polling). Marks the conversation read |
 | `POST /chat/conversations/:id/messages` | `{ body }` |
 
+## Safety: reports, blocks, account deletion (signed-in users)
+
+| Method and path | Notes |
+| --- | --- |
+| `POST /safety/reports` | `{ targetType: product\|user\|conversation, targetId, reason, details? }`. Reasons: counterfeit, prohibited, misleading, abusive, spam, scam, other. 201; a second open report on the same target by the same person is ignored; limited to 20 an hour |
+| `GET /safety/blocks`, `POST /safety/blocks` `{ userId }`, `DELETE /safety/blocks/:userId` | Blocking stops both sides from starting or continuing a chat (409 `USER_BLOCKED`) |
+| `GET /admin/reports?status=open\|actioned\|dismissed` | `admin.reports.manage` |
+| `POST /admin/reports/:id/resolve` | `admin.reports.manage`. `{ action: dismiss\|remove\|suspend, note? }`: remove archives a reported listing, suspend suspends the reported user (or the seller of a reported listing) and ends their sessions. Audited |
+| `POST /me/delete` | `{ password }`. Anonymises the account (name, email, phone, addresses), removes cart, favourites and blocks, archives a seller's listings, ends all sessions. 409 `OPEN_ORDERS` while an order, return or seller package is in progress. Order and ledger records stay without personal details. The email can be registered again |
+
+`POST /auth/password/forgot` now emails a link `APP_URL/#reset=TOKEN` when email is configured.
+`GET /chat/conversations` items include `otherUserId`.
+
 ## Health
 
 `GET /health` (process alive) and `GET /ready` (database reachable, 503 if not).

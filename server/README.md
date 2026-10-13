@@ -19,6 +19,7 @@ it module by module.
 | 9 | Commission rules (product > seller > category > default), commission frozen per order line, append-only double-entry ledger, seller balances with a 14-day hold | Done |
 | 10 | Payments: provider interface, MOCK provider, payment attempts, signed webhooks processed once, server-side checks of amount and capture, money that cannot be applied kept for refund | Done |
 | 11 | Cancelling paid packages before shipping, returns (damaged or fake, 7 days, photos, seller decision, admin escalation, deadlines), refunds through the provider with retries, refund bookings in the ledger | Done |
+| 12b | Store readiness: account deletion (`POST /me/delete`), reports and blocks (`/safety`, `/admin/reports`, migration 0012), password-reset email through Resend | Done |
 | 12 | Notifications (delivering outbox events by email/SMS/push) | Next |
 | 12a | Simple buyer-seller chat about a listing (`/chat`, migration 0011), used by the Discover swipe screen and the Inbox tab | Done |
 | 13+ | Razorpay adapter, seller payouts, dashboards | Planned |
@@ -30,7 +31,7 @@ module by module; nothing in the live app changes yet.
 
 | Item | Where | Replace before production with |
 | --- | --- | --- |
-| Password-reset token returned in the API response | `DEV_EXPOSE_RESET_TOKEN`, `auth/service.ts` | Email via the notification module. The server refuses to start in production with this on. |
+| Password-reset token returned in the API response | `DEV_EXPOSE_RESET_TOKEN`, `auth/service.ts` | Keep `false`. Reset emails go through Resend when `RESEND_API_KEY` and `EMAIL_FROM` are set (`lib/email.ts`); without them nothing is sent. Other emails (receipts, order updates) still wait for step 12. |
 | In-memory rate limits | `app.ts`, `lib/limiter.ts` | Redis store, once more than one API instance runs |
 | Supabase Storage driver not yet run against a live project | `lib/storage.ts` | Verify on staging with a private bucket before go-live |
 | Expiry of unpaid stock holds and leftover search refreshes run on a 60-second timer inside the API process | `server.ts` | Job queue (Redis + BullMQ) |

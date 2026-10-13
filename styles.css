@@ -205,3 +205,7 @@ select.inp{appearance:auto}
   .sheet{position:fixed;left:50%;right:auto;bottom:auto;top:50%;transform:translate(-50%,-50%);width:min(460px,92vw);border:1px solid var(--line);border-radius:14px}
   .toast{position:fixed;left:50%;right:auto;bottom:28px;transform:translateX(-50%);min-width:240px}
 }
+
+/* chat safety links and legal footer */
+.chat-safe{display:flex;gap:16px;justify-content:flex-end;margin-top:6px}
+.chat-safe button{font-size:.78rem;color:var(--muted);text-decoration:underline}

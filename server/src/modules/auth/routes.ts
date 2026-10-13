@@ -1,3 +1,5 @@
+import { deleteAccount } from "./deletion.js";
+import { createMailer } from "../../lib/email.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { normEmail, parse, safeText } from "../../lib/validate.js";
@@ -55,6 +57,7 @@ function sendTokens(reply: FastifyReply, t: auth.IssuedTokens, status = 200) {
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   const { cfg, db } = app;
+  const mailer = createMailer(cfg, app.log);
   const strict = (max: number, minutes: number, by: (req: FastifyRequest) => string) => ({
     rateLimit: { max, timeWindow: `${minutes} minutes`, keyGenerator: by },
   });
@@ -105,6 +108,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     // Same response time whether or not the account exists, so timing cannot reveal accounts.
     const started = Date.now();
     const token = await auth.requestPasswordReset(cfg, db, body.email, meta(req));
+    // Not awaited: the response time must not reveal whether the account exists.
+    if (token) void mailer.send({
+      to: body.email,
+      subject: "Reset your Reloved password",
+      text: `Hi,\n\nSomeone asked to reset the password for your Reloved account. Open this link to choose a new one (valid for ${cfg.PASSWORD_RESET_TTL_MINUTES} minutes):\n\n${cfg.APP_URL}/#reset=${token}\n\nIf this was not you, you can ignore this email. Your password stays the same.\n\nReloved`,
+    });
     const wait = 400 + Math.floor(Math.random() * 50) - (Date.now() - started);
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     const res: Record<string, unknown> = { message: "If that email has an account, a reset link has been sent." };
@@ -128,6 +137,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
 export async function meRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
+  // Deletes (anonymises) the signed-in account after re-entering the password. See auth/deletion.ts.
+  app.post("/delete", { config: { rateLimit: { max: 5, timeWindow: "15 minutes", keyGenerator: (r: FastifyRequest) => r.ip } } }, async (req, reply) => {
+    const body = parse(z.object({ password: z.string().min(1).max(200) }).strict(), req.body);
+    await deleteAccount(app.db, req.auth!.userId, body.password, meta(req));
+    reply.clearCookie(REFRESH_COOKIE, { path: COOKIE_PATH });
+    return reply.code(204).send();
+  });
   app.get("/", async (req) => ({ user: await auth.loadPublicUser(app.db, req.auth!.userId), permissions: [...req.auth!.permissions].sort() }));
   app.patch("/", async (req) => {
     const body = parse(z.object({ fullName: safeText(1, 120) }).strict(), req.body);

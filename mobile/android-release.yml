@@ -1,0 +1,69 @@
+name: Android app
+
+# Builds the Android app. Run it from GitHub: Actions -> "Android app" -> Run workflow.
+# Always produces a debug APK you can install on a phone to test.
+# When the four signing secrets exist it also produces the signed .aab you upload to Google Play.
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "Version shown to users (for example 1.0.0)"
+        default: "1.0.0"
+      version_code:
+        description: "Whole number that must go up with every upload to Google Play"
+        default: "1"
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      VERSION_NAME: ${{ inputs.version_name }}
+      VERSION_CODE: ${{ inputs.version_code }}
+      HAS_KEYS: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - name: Create the Android project
+        run: |
+          npx cap add android
+          node scripts/patch-android.mjs
+          npx capacitor-assets generate --android
+          npx cap sync android
+      - name: Debug APK (for testing on a phone)
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reloved-debug-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Signed release bundle (for Google Play)
+        if: ${{ env.HAS_KEYS == 'true' }}
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        working-directory: mobile/android
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.keystore"
+          export KEYSTORE_PATH="$RUNNER_TEMP/upload.keystore"
+          ./gradlew bundleRelease
+      - uses: actions/upload-artifact@v4
+        if: ${{ hashFiles('mobile/android/app/build/outputs/bundle/release/app-release.aab') != '' }}
+        with:
+          name: reloved-release-aab
+          path: mobile/android/app/build/outputs/bundle/release/app-release.aab

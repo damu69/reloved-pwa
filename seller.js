@@ -126,13 +126,34 @@ async function saveForm() {
   if (a2) b.addressLine2 = a2; else if (!isNew) b.addressLine2 = null;
   if (g) b.gstin = g; else if (!isNew) b.gstin = null;
   if (pan || isNew) b.pan = pan;
+  var rules = [
+    { id: "sf_dn", path: "displayName", label: "Store name", min: 2 },
+    { id: "sf_bn", path: "businessName", label: "Business name", min: 2 },
+    { id: "sf_pan", path: "pan", label: "PAN", req: isNew, re: /^.{10}$/, msg: "PAN has 10 characters, for example ABCDE1234F." },
+    { id: "sf_gst", path: "gstin", label: "GSTIN", req: false, re: /^.{15}$/, msg: "GSTIN has 15 characters. Leave it empty if you do not have one." },
+    { id: "sf_a1", path: "addressLine1", label: "Address line 1", min: 3 },
+    { id: "sf_c", path: "city", label: "City", min: 2 },
+    { id: "sf_s", path: "state", label: "State", min: 2 },
+    { id: "sf_z", path: "pincode", label: "PIN code", re: R.PIN_RE, msg: "Enter a 6-digit PIN code, for example 682001." },
+    { id: "sf_ph", path: "contactPhone", label: "Contact phone", re: R.PH_RE, msg: "Enter a 10-digit mobile number, for example 9876543210." }
+  ];
+  if (!R.showFieldErrors(R.checkRules(rules), "sferr")) return;
   try { if (isNew) await api.post("/seller/application", b); else await api.patch("/seller/application", b); }
-  catch (e) { var er = $("sferr"); if (er) er.textContent = errText(e); return; }
+  catch (e) { var se = R.serverFieldErrors(e, rules); R.showFieldErrors(se.fields, "sferr", se.other); return; }
   drop("sl:"); toast("Saved"); R.back();
 }
 async function saveBank() {
+  var rules = [
+    { id: "sb_n", path: "accountHolderName", label: "Account holder name", min: 2 },
+    { id: "sb_a", path: "accountNumber", label: "Account number", re: /^[0-9]{9,18}$/, msg: "Account number should be 9 to 18 digits, with no spaces." },
+    { id: "sb_c", path: "accountNumberConfirm", label: "Confirm account number", re: /^[0-9]*$/, msg: "Use digits only." },
+    { id: "sb_i", path: "ifsc", label: "IFSC", re: /^.{11}$/, msg: "IFSC has 11 characters, for example SBIN0001234." }
+  ];
+  var bad = R.checkRules(rules);
+  if (!bad.sb_c && val("sb_a") && val("sb_c") !== val("sb_a")) bad.sb_c = "Account numbers do not match. Please re-enter.";
+  if (!R.showFieldErrors(bad, "sberr")) return;
   try { await api.put("/seller/bank-account", { accountHolderName: val("sb_n"), accountNumber: val("sb_a"), accountNumberConfirm: val("sb_c"), ifsc: val("sb_i").toUpperCase() }); }
-  catch (e) { var er = $("sberr"); if (er) er.textContent = errText(e); return; }
+  catch (e) { var se = R.serverFieldErrors(e, rules); R.showFieldErrors(se.fields, "sberr", se.other); return; }
   drop("sl:"); toast("Bank account saved"); R.back();
 }
 A.slsubmit = async function () {

@@ -25,9 +25,76 @@ function toast(m) { Array.prototype.forEach.call(document.querySelectorAll(".toa
 function errText(e) {
   if (!e) return "Something went wrong.";
   if (e.code === "RATE_LIMITED") return "Too many tries. Please wait a few minutes and try again.";
-  if (e.code === "VALIDATION_FAILED" && e.details && e.details.length) return e.details.map(function (d) { return d.message; }).join(" ");
+  if (e.code === "VALIDATION_FAILED" && e.details && e.details.length) return e.details.map(function (d) { var l = humanPath(d.path); return (l ? l + ": " : "") + niceMsg(l || "This field", d.message); }).join(" ");
   return e.message || "Something went wrong.";
 }
+/* ---- Form validation helpers: plain-language messages shown under each field ---- */
+function humanPath(p) { var s = String(p || "").split(".").pop().replace(/([a-z])([A-Z0-9])/g, "$1 $2").toLowerCase(); return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; }
+// Turns technical validator text ("Too small: expected string to have >=3 characters") into plain words.
+function niceMsg(label, m) {
+  m = String(m || ""); var x;
+  if ((x = /expected string to have >=(\d+) characters/.exec(m))) return Number(x[1]) <= 1 ? label + " is required." : "Enter at least " + x[1] + " characters.";
+  if ((x = /expected string to have <=(\d+) characters/.exec(m))) return "Too long. Use at most " + x[1] + " characters.";
+  if (/received (undefined|null)/i.test(m)) return label + " is required.";
+  if (/^Invalid (input|option)/i.test(m) || /^Too (small|big)/i.test(m)) return "Please check " + label.toLowerCase() + ".";
+  return m;
+}
+// rules: [{ id: inputId, path: serverFieldName, label, req (default true), min, re, up (uppercase before regex test), msg }]
+function checkRules(rules) {
+  var errs = {};
+  rules.forEach(function (r) {
+    var v = val(r.id);
+    if (!v) { if (r.req !== false) errs[r.id] = r.label + " is required."; return; }
+    if (r.min && v.length < r.min) errs[r.id] = "Enter at least " + r.min + " characters.";
+    else if (r.re && !r.re.test(r.up ? v.toUpperCase() : v)) errs[r.id] = r.msg;
+  });
+  return errs;
+}
+// Maps a server VALIDATION_FAILED response back to the inputs; anything unmapped goes to `other`.
+function serverFieldErrors(e, rules) {
+  var out = { fields: {}, other: "" };
+  if (e && e.code === "VALIDATION_FAILED" && e.details && e.details.length) {
+    var rest = [];
+    e.details.forEach(function (d) {
+      var r = rules.filter(function (q) { return q.path === d.path; })[0];
+      if (r) out.fields[r.id] = niceMsg(r.label, d.message); else rest.push(niceMsg(humanPath(d.path) || "This field", d.message));
+    });
+    out.other = rest.join(" ");
+  } else out.other = errText(e);
+  return out;
+}
+function clearFieldErrors() {
+  Array.prototype.forEach.call(document.querySelectorAll(".ferr"), function (x) { x.remove(); });
+  Array.prototype.forEach.call(document.querySelectorAll(".inp.invalid"), function (x) { x.classList.remove("invalid"); x.removeAttribute("aria-invalid"); });
+}
+// Shows a message under each bad input, one summary line above the button, and jumps to the first problem.
+function showFieldErrors(errs, summaryId, other) {
+  clearFieldErrors();
+  var ids = Object.keys(errs), first = null;
+  ids.forEach(function (id) {
+    var el = $(id); if (!el) return;
+    el.classList.add("invalid"); el.setAttribute("aria-invalid", "true");
+    var p = document.createElement("small"); p.className = "ferr"; p.setAttribute("role", "alert"); p.textContent = errs[id];
+    el.parentNode.appendChild(p); if (!first) first = el;
+  });
+  var s = $(summaryId);
+  if (s) s.textContent = other || (ids.length === 1 ? "Please fix the field marked in red." : ids.length ? "Please fix the " + ids.length + " fields marked in red." : "");
+  if (first) { try { first.scrollIntoView({ block: "center", behavior: "smooth" }); first.focus({ preventScroll: true }); } catch (_) { } }
+  return ids.length === 0;
+}
+document.addEventListener("input", function (ev) {
+  var t = ev.target;
+  if (t && t.classList && t.classList.contains("invalid")) { t.classList.remove("invalid"); t.removeAttribute("aria-invalid"); var n = t.parentNode.querySelector(".ferr"); if (n) n.remove(); }
+});
+var PH_RE = /^\+?[0-9]{10,15}$/, PIN_RE = /^[1-9][0-9]{5}$/;
+var ADDR_RULES = [
+  { id: "adn", path: "name", label: "Full name", min: 2 },
+  { id: "adp", path: "phone", label: "Phone number", re: PH_RE, msg: "Enter a 10-digit mobile number, for example 9876543210." },
+  { id: "ad1", path: "line1", label: "Address line 1", min: 3 },
+  { id: "adc", path: "city", label: "City", min: 2 },
+  { id: "ads", path: "state", label: "State", min: 2 },
+  { id: "adz", path: "pincode", label: "PIN code", re: PIN_RE, msg: "Enter a 6-digit PIN code, for example 682001." }
+];
 function row(ic, l, v, attr, tog) { return '<button class="row" ' + attr + '><span class="ic">' + ic + '</span><span class="l">' + l + "</span>" + (v !== "" && v != null ? '<span class="v">' + v + "</span>" : "") + (tog || '<span class="chev"></span>') + "</button>"; }
 function head(title, back, right) { return '<div class="bar">' + (back ? '<button class="back" data-a="back" aria-label="Back"><span class="chev" style="transform:rotate(-135deg);margin-left:4px"></span></button>' : "") + "<h1>" + title + "</h1>" + (right || "") + "</div>"; }
 function sw(on) { return '<span class="toggle" role="switch" aria-checked="' + !!on + '"></span>'; }
@@ -389,9 +456,11 @@ async function act(a, i, j, el) {
     case "addrcancel": UI.ck.adding = false; render(); return;
     case "addrsave": {
       var b = { name: val("adn"), phone: val("adp"), line1: val("ad1"), line2: val("ad2") || undefined, landmark: val("adl") || undefined, city: val("adc"), state: val("ads"), pincode: val("adz") };
+      var bad = checkRules(ADDR_RULES);
+      if (!showFieldErrors(bad, "aderr")) return;
       try {
         var r = await api.post("/me/addresses", b); UI.ck.addressId = r.id; UI.ck.adding = false; UI.ck.idem = null; drop("addresses"); toast("Address saved");
-      } catch (e) { var er = $("aderr"); if (er) er.textContent = errText(e); return; }
+      } catch (e) { var se = serverFieldErrors(e, ADDR_RULES); showFieldErrors(se.fields, "aderr", se.other); return; }
       render(); return;
     }
     case "addrdel": try { await api.del("/me/addresses/" + i); drop("addresses"); if (UI.ck.addressId === i) UI.ck.addressId = ""; } catch (e) { toast(errText(e)); } render(); return;
@@ -492,7 +561,7 @@ async function boot() {
   if (ok) { try { await loadMe(); } catch (e) { clearSession(); } }
   S.ready = true; render(); loadFeed(false);
 }
-window.RL = { V: V, A: {}, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
+window.RL = { V: V, A: {}, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
   current: function () { return cur(); }, replace: function (v, p) { stack.pop(); go(v, p); } };
 boot();
 window.__reloved = { S: S, UI: UI };

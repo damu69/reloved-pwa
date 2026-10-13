@@ -167,3 +167,41 @@ select.inp{appearance:auto}
 .composer{align-items:flex-end}
 .composer .inp{resize:none;min-height:44px;max-height:120px;overflow-y:auto}
 .msgs{min-height:calc(100dvh - 330px)}
+
+/* Desktop web layout (laptops and wider). Phones and small tablets keep the app layout above. */
+.itemgrid{display:block}
+@media (min-width:900px){
+  body{font-size:16px}
+  #app{max-width:none;border-inline:0;flex-direction:column-reverse}
+  /* navigation becomes a top bar */
+  .nav{position:relative;border-top:0;border-bottom:1px solid var(--line);padding:0 max(24px,calc((100% - 1180px)/2));gap:4px;justify-content:flex-end;flex:none}
+  .nav::before{content:"Reloved";font-family:var(--f-display);font-size:1.7rem;margin-right:auto;align-self:center;letter-spacing:.01em}
+  .nav button{flex:none;flex-direction:row;gap:8px;padding:16px 14px;font-size:.92rem}
+  .nav button.on::before{top:auto;bottom:-1px;left:10px;right:10px}
+  .nav .dot{position:static;margin-left:2px}
+  .nav svg{width:19px;height:19px}
+  #main{padding:28px max(24px,calc((100% - 1180px)/2)) 48px}
+  h1{font-size:2.3rem}
+  .brand{display:none}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:22px 18px}
+  .tiles{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+  .chips{flex-wrap:wrap;overflow:visible}
+  .card:hover .ph{filter:brightness(1.08)}
+  /* item page: gallery left, details right */
+  .itemgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:36px;align-items:start}
+  .itemgrid .gallery{position:sticky;top:0;margin-bottom:0}
+  /* Discover: one centred card with the buttons below it */
+  .dk{max-width:430px;margin:0 auto}
+  .dk-stage{flex:none;height:clamp(360px,calc(100dvh - 400px),600px);min-height:0;max-height:none}
+  .dk-head{display:none}
+  .dk .chips{flex-wrap:nowrap;overflow-x:auto}
+  .dk-hint{font-size:.85rem}
+  /* narrower reading column for forms, lists and chat */
+  .banner,.row,.itemcard,.msgs,.composer,.empty,.auth,.sum,.steps,.two,.kv,.stars,.tabs{max-width:760px}
+  .itemgrid .iteminfo>*{max-width:none}
+  .msgs{min-height:calc(100dvh - 360px)}
+  /* dialogs sit in the middle instead of sliding from the bottom */
+  .scrim{position:fixed}
+  .sheet{position:fixed;left:50%;right:auto;bottom:auto;top:50%;transform:translate(-50%,-50%);width:min(460px,92vw);border:1px solid var(--line);border-radius:14px}
+  .toast{position:fixed;left:50%;right:auto;bottom:28px;transform:translateX(-50%);min-width:240px}
+}

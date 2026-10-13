@@ -240,7 +240,7 @@ V.item = function (pid) {
   var f = !!S.wish[pid], imgs = p.images && p.images.length ? p.images : [null];
   var off = v && v.mrpPaise > v.pricePaise ? Math.round((1 - v.pricePaise / v.mrpPaise) * 100) : 0;
   return head("", true, '<button class="back" data-a="fav" data-i="' + esc(pid) + '" aria-label="Favourite" aria-pressed="' + f + '"><span class="heart' + (f ? " on" : "") + '" style="position:static;background:none">' + HEART + "</span></button>") +
-    '<div class="gallery">' + imgs.map(function (im) { return ph(p.title, pid, im && im.id, 1200); }).join("") + "</div>" +
+    '<div class="itemgrid"><div class="gallery">' + imgs.map(function (im) { return ph(p.title, pid, im && im.id, 1200); }).join("") + '</div><div class="iteminfo">' +
     "<h2>" + esc(p.title) + '</h2><div class="price" style="font-size:1.2rem;margin:4px 0">' + (v ? inr(v.pricePaise) : "") + (off ? ' <s class="muted small" style="font-weight:400">' + inr(v.mrpPaise) + '</s> <small>' + off + "% off</small>" : "") + '</div><div class="muted small">Price includes GST</div>' +
     (vs.length > 1 || (vs[0] && Object.keys(vs[0].options || {}).length) ? '<h3 style="margin:14px 0 6px">' + (vs.length > 1 ? "Choose an option" : "Option") + '</h3><div class="chips" style="flex-wrap:wrap">' + vs.map(function (x) { return '<button class="chip' + (v && x.id === v.id ? " on" : "") + '" data-a="vsel" data-i="' + esc(pid) + '" data-j="' + esc(x.id) + '"' + (x.inStock ? "" : ' style="opacity:.45;text-decoration:line-through"') + ">" + esc(variantLabel(x.options)) + "</button>"; }).join("") + "</div>" : "") +
     (v && v.onlyLeft ? '<div class="pill prog" style="display:inline-block">Only ' + v.onlyLeft + " left</div>" : "") +
@@ -250,7 +250,7 @@ V.item = function (pid) {
     (p.seller ? '<button class="itemcard" data-a="seller" data-i="' + esc(p.seller.id) + '" data-j="' + esc(p.seller.displayName) + '" style="margin:12px 0"><span class="av" style="background:hsl(' + hueOf(p.seller.displayName) + ',40%,32%)">' + esc(String(p.seller.displayName).slice(0, 1).toUpperCase()) + '</span><span style="flex:1"><b>' + esc(p.seller.displayName) + '</b><br><span class="muted small">See more from this seller</span></span><span class="chev"></span></button>' : "") +
     '<button class="btn ghost block" data-a="msgseller" data-i="' + esc(pid) + '" style="margin-bottom:10px">Message seller</button>' +
     (v && v.inStock ? (inCart ? '<div class="two"><button class="btn ghost" data-a="tab" data-i="cart">View cart (' + inCart.quantity + ')</button><button class="btn" data-a="addcart" data-i="' + esc(v.id) + '">Add one more</button></div>' : '<button class="btn block" data-a="addcart" data-i="' + esc(v.id) + '"' + (UI.busy ? " disabled" : "") + ">Add to cart</button>") : '<div class="banner">This option is sold out.</div>') +
-    '<p class="muted small" style="margin-top:10px">Buyer Protection and delivery fees are added at checkout.</p>';
+    '<p class="muted small" style="margin-top:10px">Buyer Protection and delivery fees are added at checkout.</p></div></div>';
 };
 function probText(p) {
   var code = p && (p.code || p), n = p && (p.available != null ? p.available : p.left);

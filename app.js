@@ -14,9 +14,41 @@ function stLabel(s) { return ORDER_ST[s] || String(s || "").replace(/_/g, " "); 
 function stClass(s) { return s === "delivered" ? "ok" : s === "cancelled" ? "bad" : "prog"; }
 function variantLabel(o) { var v = o && Object.keys(o).map(function (k) { return o[k]; }); return v && v.length ? v.join(" / ") : "Standard"; }
 function hueOf(s) { var h = 0; s = String(s || ""); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h; }
-function ph(title, pid, imgId, size, extra) {
-  var h = hueOf(title), bg = "background:linear-gradient(150deg,hsl(" + h + ",38%,38%),hsl(" + ((h + 30) % 360) + ",42%,20%))";
-  return '<div class="ph" style="' + bg + '">' + esc(String(title || "?").slice(0, 2).toUpperCase()) +
+var TONES = ["#3a342e", "#32382f", "#2f353b", "#3b3135", "#3b3829", "#2d3a37", "#3a2f2b", "#33313f"];
+var ICONS = {
+  tee: "M21 10l-13 8 6 9 7-4v27h20V23l7 4 6-9-13-8c-2 4-6 6-10 6s-8-2-10-6z",
+  dress: "M26 7h12l1 14-5 4 14 31H16l14-31-5-4zM26 7l1 7M38 7l-1 7M28 25h8",
+  trousers: "M19 8h26l4 49H36l-4-27-4 27H15z M19 8l1 8h24l1-8",
+  jacket: "M21 10l-13 8 6 9 7-4v27h20V23l7 4 6-9-13-8c-2 4-6 6-10 6s-8-2-10-6zM32 16v38M24 38h4M36 38h4",
+  shoe: "M7 46V33c0-2 1.5-3.5 3.5-3.5h6.5l6-10 5 6 10 4.5c6 2 11 5 13 10v6M7 46h50v6H7zM25 24l3 4M30 27l3 4",
+  bag: "M13 24h38l4 32H9zM22 24v-6a10 10 0 0 1 20 0v6M13 24l-4 32",
+  backpack: "M19 24a13 12 0 0 1 26 0v33H19zM24 42h16v9H24zM26 24v-7M38 24v-7M27 11a5 5 0 0 1 10 0",
+  watch: "M24 6h16l2 12H22zM24 58h16l2-12H22zM32 18a14 14 0 1 1 0 28 14 14 0 0 1 0-28zM32 26v7l5 3",
+  glasses: "M5 28h54M9 28v8c0 6 6 9 12 9s11-4 11-10v-7M55 28v8c0 6-6 9-12 9s-11-4-11-10",
+  earring: "M32 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM32 16v9M21 25h22l-4 21a7 7 0 0 1-14 0z",
+  vase: "M26 7h12v9c8 6 11 14 9 24-1 9-6 15-15 15s-14-6-15-15c-2-10 1-18 9-24zM26 7h12M24 30h16",
+  hanger: "M32 18a5 5 0 1 0-5-5M32 18v5L7 45h50L32 23"
+};
+function iconFor(cat) {
+  cat = String(cat || "");
+  if (/jeans|trousers/.test(cat)) return "trousers";
+  if (/jackets/.test(cat)) return "jacket";
+  if (/dresses|sarees/.test(cat)) return "dress";
+  if (/tops|tshirts|shirts|kurtas|kids/.test(cat)) return "tee";
+  if (/^footwear/.test(cat)) return "shoe";
+  if (/backpacks/.test(cat)) return "backpack";
+  if (/^bags/.test(cat)) return "bag";
+  if (/watches/.test(cat)) return "watch";
+  if (/sunglasses/.test(cat)) return "glasses";
+  if (/jewellery/.test(cat)) return "earring";
+  if (/^home/.test(cat)) return "vase";
+  return "hanger";
+}
+var PCAT = {}; // product id -> category path, learned from the feed and item pages, so tiles without a photo can show a fitting drawing
+function ph(title, pid, imgId, size, extra, cat) {
+  var bg = "background:" + TONES[hueOf(title) % TONES.length];
+  var art = '<svg class="phi" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + ICONS[iconFor(cat || PCAT[pid])] + '"/></svg>';
+  return '<div class="ph" style="' + bg + '">' + art +
     (imgId ? '<img loading="lazy" alt="" src="' + esc(api.media(pid, imgId, size || 600)) + '" onerror="this.remove()">' : "") + (extra || "") + "</div>";
 }
 var HEART = '<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3 5 6.5 5c2 0 3.6 1.1 5.5 3 1.9-1.9 3.5-3 5.5-3C21 5 22.8 8.6 21.5 11.8 19.5 16.4 12 21 12 21z"/></svg>';
@@ -148,7 +180,7 @@ async function loadFeed(more) {
   try {
     var r = await api.get(feedUrl(more ? F.next : null), { anon: !signedIn() });
     if (my !== feedSeq) return; // a newer search replaced this one
-    F.items = more ? F.items.concat(r.items) : r.items; F.next = r.nextCursor || null; F.loaded = true;
+    (r.items || []).forEach(function (i) { PCAT[i.id] = i.categoryPath; }); F.items = more ? F.items.concat(r.items) : r.items; F.next = r.nextCursor || null; F.loaded = true;
   } catch (e) { if (my !== feedSeq) return; F.error = errText(e); }
   F.loading = false; partialFeed();
 }
@@ -185,7 +217,7 @@ V.home = function () {
     tops.map(function (c) { return '<button class="chip' + (top === c.path ? " on" : "") + '" data-a="cat" data-i="' + esc(c.path) + '">' + esc(c.name) + "</button>"; }).join("");
   var subchips = subs.length ? '<div class="chips"><button class="chip' + (UI.cat === top ? " on" : "") + '" data-a="cat" data-i="' + esc(top) + '">All ' + esc((catByPath(top) || {}).name || "") + "</button>" +
     subs.map(function (c) { return '<button class="chip' + (UI.cat === c.path ? " on" : "") + '" data-a="cat" data-i="' + esc(c.path) + '">' + esc(c.name) + "</button>"; }).join("") + "</div>" : "";
-  return '<div style="display:flex;gap:8px;margin-bottom:12px"><div class="search" style="flex:1"><span class="muted">&#9906;</span><input id="q" type="search" placeholder="Search for items" value="' + esc(UI.q) + '" aria-label="Search"></div><button class="chip' + (UI.fil ? " on" : "") + '" data-a="fil">Filters</button></div>' +
+  return '<div class="brand">Re<em>loved</em></div><div style="display:flex;gap:8px;margin-bottom:12px"><div class="search" style="flex:1"><span class="muted">&#9906;</span><input id="q" type="search" placeholder="Search for items" value="' + esc(UI.q) + '" aria-label="Search"></div><button class="chip' + (UI.fil ? " on" : "") + '" data-a="fil">Filters</button></div>' +
     (UI.fil ? '<div class="banner"><div class="two"><label class="field"><span>Sort</span><select class="inp" id="fs" data-f="1"><option value="">' + (UI.q.trim() ? "Best match" : "Newest") + '</option><option value="price_asc"' + (UI.sort === "price_asc" ? " selected" : "") + '>Price: low to high</option><option value="price_desc"' + (UI.sort === "price_desc" ? " selected" : "") + '>Price: high to low</option></select></label>' +
       '<label class="field"><span>Condition</span><select class="inp" id="fc" data-f="1"><option value="">Any</option>' + Object.keys(COND).map(function (k) { return '<option value="' + k + '"' + (UI.cond === k ? " selected" : "") + ">" + COND[k] + "</option>"; }).join("") + "</select></label></div>" +
       '<div class="two"><label class="field"><span>Min price (₹)</span><input class="inp" id="fmin" data-f="1" inputmode="numeric" value="' + esc(UI.minp) + '" placeholder="0"></label><label class="field"><span>Max price (₹)</span><input class="inp" id="fmax" data-f="1" inputmode="numeric" value="' + esc(UI.maxp) + '" placeholder="No limit"></label></div></div>' : "") +
@@ -196,13 +228,13 @@ V.home = function () {
 V.browse = function () {
   var tops = topCats();
   return head("Browse") + '<form class="search" id="bf"><span class="muted">&#9906;</span><input id="q2" type="search" placeholder="Search for items" aria-label="Search"></form>' +
-    (tops.length ? '<div class="tiles">' + tops.map(function (c) { var h = hueOf(c.name); return '<button class="tile" data-a="browse" data-i="' + esc(c.path) + '" style="background:linear-gradient(150deg,hsl(' + h + ',40%,36%),hsl(' + ((h + 30) % 360) + ',45%,20%))"><span>' + esc(c.name) + "</span></button>"; }).join("") + "</div>" : '<div class="empty"><h2>No categories yet</h2>Categories appear here once the catalogue is set up.</div>');
+    (tops.length ? '<div class="tiles">' + tops.map(function (c) { var h = hueOf(c.name); return '<button class="tile" data-a="browse" data-i="' + esc(c.path) + '" style="background:' + TONES[h % TONES.length] + '"><span>' + esc(c.name) + "</span></button>"; }).join("") + "</div>" : '<div class="empty"><h2>No categories yet</h2>Categories appear here once the catalogue is set up.</div>');
 };
 V.item = function (pid) {
   var c = need("item:" + pid, function () { return api.get("/catalogue/products/" + pid, { anon: !signedIn() }); });
   if (c.st === "loading") return head("", true) + loadingBox();
   if (c.st === "err") return head("Item", true) + (c.code === "NOT_FOUND" ? '<div class="empty"><h2>Item not found</h2>It may have been removed or is no longer for sale.</div>' : failBox(c.err));
-  var p = c.data, vs = p.variants || [], sel = UI.pdv[pid];
+  var p = c.data, vs = p.variants || [], sel = UI.pdv[pid]; PCAT[pid] = p.categoryPath;
   var v = vs.filter(function (x) { return x.id === sel; })[0] || vs.filter(function (x) { return x.inStock; })[0] || vs[0];
   var inCart = v && S.cart && S.cart.items.filter(function (i) { return i.variantId === v.id; })[0];
   var f = !!S.wish[pid], imgs = p.images && p.images.length ? p.images : [null];
@@ -216,6 +248,7 @@ V.item = function (pid) {
     Object.keys(p.attributes || {}).map(function (k) { return "<dt>" + esc(k) + "</dt><dd>" + esc(p.attributes[k]) + "</dd>"; }).join("") + "</dl>" +
     (p.description ? "<p>" + esc(p.description).replace(/\n/g, "<br>") + "</p>" : "") +
     (p.seller ? '<button class="itemcard" data-a="seller" data-i="' + esc(p.seller.id) + '" data-j="' + esc(p.seller.displayName) + '" style="margin:12px 0"><span class="av" style="background:hsl(' + hueOf(p.seller.displayName) + ',40%,32%)">' + esc(String(p.seller.displayName).slice(0, 1).toUpperCase()) + '</span><span style="flex:1"><b>' + esc(p.seller.displayName) + '</b><br><span class="muted small">See more from this seller</span></span><span class="chev"></span></button>' : "") +
+    '<button class="btn ghost block" data-a="msgseller" data-i="' + esc(pid) + '" style="margin-bottom:10px">Message seller</button>' +
     (v && v.inStock ? (inCart ? '<div class="two"><button class="btn ghost" data-a="tab" data-i="cart">View cart (' + inCart.quantity + ')</button><button class="btn" data-a="addcart" data-i="' + esc(v.id) + '">Add one more</button></div>' : '<button class="btn block" data-a="addcart" data-i="' + esc(v.id) + '"' + (UI.busy ? " disabled" : "") + ">Add to cart</button>") : '<div class="banner">This option is sold out.</div>') +
     '<p class="muted small" style="margin-top:10px">Buyer Protection and delivery fees are added at checkout.</p>';
 };
@@ -382,11 +415,26 @@ function render() {
   var c = cur(), v = c.v, keep = main.scrollTop, same = main.dataset.v === v + ":" + (c.p || "");
   main.innerHTML = (V[v] || V.home)(c.p); main.dataset.v = v + ":" + (c.p || "");
   nav.hidden = v === "auth";
-  var n = cartCount();
-  var tabs = [["home", "Home", '<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'], ["browse", "Browse", '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'], ["sell", "Sell", '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'], ["cart", "Cart", '<path d="M3 4h2l2.4 11h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/>'], ["profile", "Profile", '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>']];
-  nav.innerHTML = tabs.map(function (t) { return '<button data-a="tab" data-i="' + t[0] + '" class="' + (!stack.length && tab === t[0] ? "on" : "") + '" aria-label="' + t[1] + '"><svg viewBox="0 0 24 24">' + t[2] + "</svg>" + t[1] + (t[0] === "cart" && n ? ' <span class="dot">' + n + "</span>" : "") + "</button>"; }).join("");
+  renderNav();
   if (same) main.scrollTop = keep;
   if (window.RL) RL.hooks.forEach(function (f) { try { f(); } catch (e) { } });
+}
+function renderNav() {
+  var nav = $("nav"), n = cartCount(), u = S.unread || 0;
+  var I = function (d) { return '<svg viewBox="0 0 24 24">' + d + "</svg>"; };
+  var tabs = [
+    ["home", "Home", I('<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>')],
+    ["discover", "Discover", I('<rect x="4" y="4" width="12" height="16" rx="2"/><path d="M19 7l2 11-4 1"/>')],
+    ["sell", "Sell", I('<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>')],
+    ["inbox", "Inbox", I('<path d="M4 5h16v11H10l-5 4v-4H4z"/>')],
+    ["cart", "Cart", I('<path d="M3 4h2l2.4 11h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/>')],
+    ["profile", "Profile", I('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>')]
+  ];
+  var badge = { cart: n, inbox: u };
+  nav.innerHTML = tabs.map(function (t) {
+    var on = (!stack.length && tab === t[0]) || (stack.length && t[0] === "inbox" && cur().v === "chat");
+    return '<button data-a="tab" data-i="' + t[0] + '" class="' + (on ? "on" : "") + '" aria-label="' + t[1] + '">' + t[2] + "<span>" + t[1] + "</span>" + (badge[t[0]] ? '<i class="dot">' + (badge[t[0]] > 9 ? "9+" : badge[t[0]]) + "</i>" : "") + "</button>";
+  }).join("");
 }
 function refresh() { if (typing()) { dirty = true; return; } render(); }
 document.addEventListener("focusout", function () { setTimeout(function () { if (dirty && !typing()) render(); }, 50); });
@@ -399,6 +447,7 @@ function enter(v, p) {
   if (v === "item") { drop("item:" + p); if (signedIn() && !S.cart) loadCart().then(refresh); }
   if (v === "auth") UI.auth.err = "";
   if (v === "home" && !UI.feed.loaded) loadFeed(false);
+  if (window.RL && RL.E && RL.E[v]) RL.E[v](p);
 }
 function go(v, p) { UI.confirm = null; stack.push({ v: v, p: p }); enter(v, p); render(); $("main").scrollTop = 0; }
 function setTab(t) { stack = []; tab = t; UI.confirm = null; enter(t); render(); $("main").scrollTop = 0; }
@@ -561,7 +610,7 @@ async function boot() {
   if (ok) { try { await loadMe(); } catch (e) { clearSession(); } }
   S.ready = true; render(); loadFeed(false);
 }
-window.RL = { V: V, A: {}, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
+window.RL = { V: V, A: {}, E: {}, PCAT: PCAT, paintNav: renderNav, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
   current: function () { return cur(); }, replace: function (v, p) { stack.pop(); go(v, p); } };
 boot();
 window.__reloved = { S: S, UI: UI };

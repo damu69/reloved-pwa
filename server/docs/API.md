@@ -380,6 +380,19 @@ fails, the refund stays `pending` and is retried with back-off (30 s doubling to
 `returnShipDays`, `returnReceiptDays` and `returnShippingPaise` (with a `reason`); they apply to returns
 requested from then on.
 
+## Chat (signed-in users)
+
+One conversation per buyer and listing. Messages are plain text, 1 to 1000 characters.
+Limits: 40 messages a minute, 40 new conversations an hour.
+
+| Method and path | Notes |
+| --- | --- |
+| `GET /chat/conversations` | Your conversations (as buyer or seller), newest first, with the listing, the other side, the last message and `unread` |
+| `GET /chat/unread` | `{ messages, conversations }` for the Inbox badge |
+| `POST /chat/conversations` | `{ productId, message? }`. 201 when created, 200 when it already exists (the message is added). 409 `OWN_PRODUCT` for your own listing; 404 if the listing is not live |
+| `GET /chat/conversations/:id/messages?after=` | Messages in order; `after` returns only newer ones (used for polling). Marks the conversation read |
+| `POST /chat/conversations/:id/messages` | `{ body }` |
+
 ## Health
 
 `GET /health` (process alive) and `GET /ready` (database reachable, 503 if not).

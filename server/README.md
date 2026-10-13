@@ -20,6 +20,7 @@ it module by module.
 | 10 | Payments: provider interface, MOCK provider, payment attempts, signed webhooks processed once, server-side checks of amount and capture, money that cannot be applied kept for refund | Done |
 | 11 | Cancelling paid packages before shipping, returns (damaged or fake, 7 days, photos, seller decision, admin escalation, deadlines), refunds through the provider with retries, refund bookings in the ledger | Done |
 | 12 | Notifications (delivering outbox events by email/SMS/push) | Next |
+| 12a | Simple buyer-seller chat about a listing (`/chat`, migration 0011), used by the Discover swipe screen and the Inbox tab | Done |
 | 13+ | Razorpay adapter, seller payouts, dashboards | Planned |
 
 The existing PWA at the repo root still talks to Supabase directly. It moves to this API
@@ -42,6 +43,7 @@ module by module; nothing in the live app changes yet.
 | Payments marked `needs_refund` are refunded only when an admin asks (`POST /admin/payments/:id/refund`) | `refunds/service.ts` | Confirm whether these should be refunded automatically |
 | GST on commission and fees: on hold by the owner's decision (2026-10-07) | `finance/service.ts` | Decide with the accountant |
 | Paid orders and packages cannot be cancelled yet | `orders/service.ts` | Refunds and cancellations (step 11) |
+| Chat has no push or email alerts; the app polls every few seconds while Inbox or a chat is open | `chat/routes.ts` | Notifications (step 12), websockets if needed |
 | Outbox events are written but not yet delivered | `outbox_events` | Notifications (step 12) |
 | Payouts to sellers' bank accounts are not built; `paidOutPaise` is always 0 | `finance/ledger.ts` | Payouts module |
 | No GST on commission or on the Buyer Protection fee; no GST TCS (section 52) or income-tax TDS (194-O) withheld from sellers | `finance/service.ts` | Confirm with the accountant before launch |
@@ -49,6 +51,12 @@ module by module; nothing in the live app changes yet.
 | A seller's available balance can go negative after a refund; payouts must net it | `finance/ledger.ts` | Payouts module |
 | Return deadlines and refund retries run on the 60-second timer in the API process | `server.ts` | Job queue (Redis + BullMQ) |
 | Required KYC documents are a default (PAN card, address proof, bank proof, GST certificate if GSTIN given) | `sellers/rules.ts` | Confirm with the business / accountant |
+
+### Demo data (optional)
+
+`db/demo-seed.sql` adds 8 demo sellers and 46 listings to the database so the app does not look empty.
+Paste it into the Supabase SQL Editor and run it once. Demo accounts cannot log in. `db/demo-reply.sql`
+makes the demo sellers answer any chats you started; `db/demo-remove.sql` removes everything again.
 
 ## Run locally
 

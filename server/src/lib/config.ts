@@ -71,7 +71,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (/change[-_]?me|example|secret123/i.test(c.JWT_SECRET)) throw new Error("JWT_SECRET looks like a placeholder");
     if (c.DATABASE_SSL === "off") throw new Error("DATABASE_SSL must be require or verify-full in production");
     if (c.STORAGE_DRIVER !== "supabase") throw new Error("STORAGE_DRIVER must be supabase in production (local disk is lost on redeploy)");
-    if (/localhost|127\.0\.0\.1|http:\/\//.test(c.CORS_ORIGINS)) throw new Error("CORS_ORIGINS must list only https production origins");
+    // https://localhost is the Android app's own origin and is allowed; plain http and loopback addresses are not.
+    if (/127\.0\.0\.1|http:\/\//.test(c.CORS_ORIGINS)) throw new Error("CORS_ORIGINS must list only https production origins");
     if (c.PAYMENT_PROVIDER === "mock") throw new Error("PAYMENT_PROVIDER=mock is not allowed in production: fake payments would mark real orders paid");
   }
   if (c.STORAGE_DRIVER === "supabase" && (!c.SUPABASE_URL || !c.SUPABASE_SERVICE_ROLE_KEY)) {

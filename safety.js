@@ -119,8 +119,20 @@ A.adrs = async function (id, act) {
 
 /* ---------- Android app: the phone's back button goes back inside the app, and exits only from the top level ---------- */
 (function () {
-  var C = window.Capacitor, App = C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.App;
+  var C = window.Capacitor, App = C && C.isNativePlatform && C.isNativePlatform() && C.registerPlugin && C.registerPlugin("App");
   if (App && App.addListener) App.addListener("backButton", function () { if (R.canBack()) R.back(); else App.exitApp(); });
+})();
+
+/* ---------- offline notice (the app opens even without a connection) ---------- */
+(function () {
+  var bar;
+  function show(off) {
+    if (!bar) { bar = document.createElement("div"); bar.setAttribute("role", "status"); bar.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:99;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;background:#3a2f28;color:#f3ece4;text-align:center;font-size:13px;display:none"; bar.textContent = "You're offline. Reconnect to browse and buy."; document.body.appendChild(bar); }
+    bar.style.display = off ? "block" : "none";
+  }
+  window.addEventListener("offline", function () { show(true); });
+  window.addEventListener("online", function () { show(false); if (window.RL && RL.refresh) RL.refresh(); });
+  if (navigator.onLine === false) show(true);
 })();
 
 /* ---------- forms ---------- */

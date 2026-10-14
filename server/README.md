@@ -123,7 +123,7 @@ Trial deployment (Vercel + the existing Supabase project, payments paused): see 
 - Then run `db/app-role.sql` once and point `DATABASE_URL` at the limited `reloved_app` role.
 - Create a PRIVATE Supabase Storage bucket `seller-kyc`; set `STORAGE_DRIVER=supabase`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
 - Set a fresh `DATA_ENCRYPTION_KEY` and store a backup copy outside the hosting platform.
-- Set `NODE_ENV=production`, a fresh `JWT_SECRET`, `COOKIE_SECURE=true`, `CORS_ORIGINS=https://reloved-pwa.vercel.app`, `TRUST_PROXY_HOPS=1`.
+- Set `NODE_ENV=production`, a fresh `JWT_SECRET`, `COOKIE_SECURE=true`, `CORS_ORIGINS=https://reloved-pwa.vercel.app,https://localhost` (the second is the Android app's origin), `TRUST_PROXY_HOPS=1`.
 - Rollback: redeploy the previous build. Migrations only add things, so the previous build still works with the newer schema.
 
 The server refuses to start in production if the mock reset token is on, cookies are insecure,

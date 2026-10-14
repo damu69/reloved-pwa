@@ -30,6 +30,11 @@ httpOnly cookie `rl_rt` scoped to `/api/v1/auth`. Cookie routes (`/auth/refresh`
 need the header `X-Requested-With: reloved`, and the browser's Origin must be in `CORS_ORIGINS`.
 Call fetch with `credentials: "include"`.
 
+**Native app mode.** The Android app (origin `https://localhost`, which must be in `CORS_ORIGINS`) sends the header
+`X-Client: app` on every request. Then `register`, `login` and `refresh` return `refreshToken` and `refreshExpiresAt` in the
+JSON body and set no cookie; the app sends the token back as `{ "refreshToken": "…" }` to `/auth/refresh` and `/auth/logout`
+(still with `X-Requested-With: reloved`). Tokens rotate: each refresh token works once. Cookies are ignored in app mode.
+
 **Pagination.** `?limit=20&cursor=…`; responses are `{ "items": [...], "nextCursor": "…" | null }`.
 
 ## Auth

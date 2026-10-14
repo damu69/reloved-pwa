@@ -39,6 +39,7 @@ jobs:
       - run: npm ci
       - name: Create the Android project
         run: |
+          node scripts/build-www.mjs
           npx cap add android
           node scripts/patch-android.mjs
           npx capacitor-assets generate --android

@@ -138,3 +138,38 @@ describe("expired access token", () => {
     expect(r.json().error.code).toBe("SESSION_EXPIRED");
   });
 });
+
+describe("app mode (X-Client: app)", () => {
+  const APP = { ...CSRF, "x-client": "app" };
+  it("returns the refresh token in the body, sets no cookie, and rotates it via the body", async () => {
+    const r = await t.app.inject({ method: "POST", url: "/api/v1/auth/register", headers: { "x-client": "app" }, payload: { email: "appuser@example.com", password: "correct horse battery", fullName: "App User" } });
+    expect(r.statusCode).toBe(201);
+    const b = r.json();
+    expect(b.refreshToken).toBeTypeOf("string");
+    expect(r.headers["set-cookie"]).toBeUndefined();
+    const r2 = await t.app.inject({ method: "POST", url: "/api/v1/auth/refresh", headers: APP, payload: { refreshToken: b.refreshToken } });
+    expect(r2.statusCode).toBe(200);
+    const b2 = r2.json();
+    expect(b2.refreshToken).toBeTypeOf("string");
+    expect(b2.refreshToken).not.toBe(b.refreshToken);
+    expect(r2.headers["set-cookie"]).toBeUndefined();
+    // the old token is single-use
+    const reuse = await t.app.inject({ method: "POST", url: "/api/v1/auth/refresh", headers: APP, payload: { refreshToken: b.refreshToken } });
+    expect(reuse.statusCode).toBe(401);
+  });
+  it("logout via body revokes the token; a cookie is not accepted in app mode", async () => {
+    const l = await t.app.inject({ method: "POST", url: "/api/v1/auth/login", headers: { "x-client": "app" }, payload: { email: "appuser@example.com", password: "correct horse battery" } });
+    const rt = l.json().refreshToken;
+    const viaCookie = await t.app.inject({ method: "POST", url: "/api/v1/auth/refresh", headers: APP, cookies: { rl_rt: rt } });
+    expect(viaCookie.statusCode).toBe(401);
+    const out = await t.app.inject({ method: "POST", url: "/api/v1/auth/logout", headers: APP, payload: { refreshToken: rt } });
+    expect(out.statusCode).toBeLessThan(300);
+    const after = await t.app.inject({ method: "POST", url: "/api/v1/auth/refresh", headers: APP, payload: { refreshToken: rt } });
+    expect(after.statusCode).toBe(401);
+  });
+  it("website login still uses the cookie and does not expose the token in the body", async () => {
+    const l = await login("appuser@example.com");
+    expect(l.json().refreshToken).toBeUndefined();
+    expect(String(l.headers["set-cookie"])).toMatch(/HttpOnly/);
+  });
+});

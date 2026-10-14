@@ -15,6 +15,7 @@ Without this, the "Forgot password?" link will not send anything.
    - `RESEND_API_KEY` = the key
    - `EMAIL_FROM` = for example `Reloved <no-reply@yourdomain.com>` (must be on the verified domain)
    - `APP_URL` = `https://reloved-pwa.vercel.app`
+   - `CORS_ORIGINS` = keep the existing value and **add** `https://localhost` (comma-separated). The app runs from this address; without it the app cannot log in.
 4. Redeploy the API project. Test: use Forgot password with your own email.
 
 ## 2. Create your Google Play developer account (MIA Solutions)
@@ -90,8 +91,9 @@ Google reviewers test the app like a customer. Make sure:
 - The contact email in the Privacy Policy is one you actually read.
 
 ## 9. Updating later
-- Website changes (screens, fixes): push to GitHub. Vercel updates the site and the app picks it up at once.
-- Native changes (icon, version, plugins): bump the version code and run the workflow again, then upload the new `.aab`.
+- API changes: push to GitHub; Vercel updates the API and the app uses it at once.
+- Website screen changes (anything in `web/`): push to GitHub (updates the website), **and** bump the version code and run the workflow again, then upload the new `.aab`, because the app carries its own copy of the screens.
+- Native changes (icon, plugins): same, bump the version code, run the workflow, upload.
 
 ## What I could not do for you
 Create your Play Console and GitHub secrets, run Google's verification, test on a physical Android phone, or

@@ -399,7 +399,7 @@ V.help = function () {
   return head("Help Centre", true) + '<div class="list">' + q.map(function (x) { return '<div class="row" style="display:block"><b>' + x[0] + '</b><br><span class="muted">' + x[1] + "</span></div>"; }).join("") + "</div>";
 };
 V.about = function () { return head("About", true) + '<div class="list">' + [["Our platform", "platform"], ["How it works", "how"], ["Trust and Safety", "trust"]].map(function (t) { return row("i", t[0], "", 'data-a="go" data-i="doc" data-j="' + t[1] + '"'); }).join("") + "</div>"; };
-V.legal = function () { return head("Terms &amp; legal", true) + '<div class="list">' + row("§", "User Terms and Conditions", "", 'data-a="go" data-i="tc"') + row("§", "Privacy Centre", "", 'data-a="go" data-i="doc" data-j="privacy"') + '<a class="row" href="/privacy.html" target="_blank" rel="noopener"><span class="ic">§</span><span class="l">Full Privacy Policy</span><span class="chev"></span></a><a class="row" href="/terms.html" target="_blank" rel="noopener"><span class="ic">§</span><span class="l">Terms of Use</span><span class="chev"></span></a>' + "</div>"; };
+V.legal = function () { return head("Terms &amp; legal", true) + '<div class="list">' + row("§", "User Terms and Conditions", "", 'data-a="go" data-i="tc"') + row("§", "Privacy Centre", "", 'data-a="go" data-i="doc" data-j="privacy"') + '<a class="row" href="'+(window.APP_CONFIG.SITE||"")+'/privacy.html" target="_blank" rel="noopener"><span class="ic">§</span><span class="l">Full Privacy Policy</span><span class="chev"></span></a><a class="row" href="'+(window.APP_CONFIG.SITE||"")+'/terms.html" target="_blank" rel="noopener"><span class="ic">§</span><span class="l">Terms of Use</span><span class="chev"></span></a>' + "</div>"; };
 V.tc = function () {
   return head("User Terms and Conditions", true) + '<div class="doc"><h3>1. About you and us</h3><p>Who runs the service and what the defined terms mean.</p><h3>2. Your account</h3><p>Keep your account secure and report unauthorised use. Members must be 18 or over.</p><h3>3. Buying</h3><p>Prices include GST. Delivery and Buyer Protection fees are shown before you order. Pay only through the app to keep Buyer Protection.</p><h3>4. Selling</h3><p>Sellers are verified before they can sell. List only items you own and describe them honestly. Counterfeit, illegal or unsafe items are not allowed.</p><h3>5. Cancellations and returns</h3><p>A paid package can be cancelled until it ships. Returns are accepted within 7 days of delivery for damaged or fake items only.</p><p class="small">Summary for the trial. Not legal advice.</p></div>';
 };
@@ -605,7 +605,7 @@ document.addEventListener("change", function (ev) {
 api.onLogout(function () { clearSession(); toast("Please sign in again"); stack = []; render(); });
 async function boot() {
   $("main").innerHTML = '<div class="loading">Loading marketplace…</div>';
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
+  if ("serviceWorker" in navigator && !(window.api && window.api.isApp)) navigator.serviceWorker.register("sw.js").catch(function () {});
   await loadCats();
   var ok = await api.restore();
   if (ok) { try { await loadMe(); } catch (e) { clearSession(); } }

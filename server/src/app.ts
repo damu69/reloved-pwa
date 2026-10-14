@@ -64,7 +64,7 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
     origin: cfg.corsOrigins,
     credentials: true,
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Idempotency-Key", "X-Request-Id"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Idempotency-Key", "X-Request-Id", "X-Client"],
     maxAge: 600,
   });
   await app.register(cookie);

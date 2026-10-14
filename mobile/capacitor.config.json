@@ -3,14 +3,22 @@
   "appName": "Reloved",
   "webDir": "www",
   "server": {
-    "url": "https://reloved-pwa.vercel.app",
     "androidScheme": "https",
-    "allowNavigation": ["reloved-pwa.vercel.app"],
     "cleartext": false
   },
-  "android": { "allowMixedContent": false, "backgroundColor": "#151311" },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#151311"
+  },
   "plugins": {
-    "SplashScreen": { "launchShowDuration": 800, "backgroundColor": "#151311", "showSpinner": false },
-    "StatusBar": { "style": "DARK", "backgroundColor": "#151311" }
+    "SplashScreen": {
+      "launchShowDuration": 800,
+      "backgroundColor": "#151311",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#151311"
+    }
   }
 }

@@ -40,18 +40,31 @@ function csrfCheck(req: FastifyRequest): void {
   if (origin && !req.server.cfg.corsOrigins.includes(origin)) throw Errors.forbidden("Origin not allowed.");
 }
 
-function sendTokens(reply: FastifyReply, t: auth.IssuedTokens, status = 200) {
-  reply.setCookie(REFRESH_COOKIE, t.refreshToken, {
-    httpOnly: true,
-    secure: reply.server.cfg.COOKIE_SECURE === "true",
-    sameSite: "strict",
-    path: COOKIE_PATH,
-    expires: t.refreshExpiresAt,
-  });
+// The Android/iOS app (served from its own origin, so the cookie would be third-party and blocked) sends
+// `X-Client: app` and keeps the refresh token itself: it is returned in the body and read back from the body.
+// The website keeps using the httpOnly cookie. Either way the token is single-use and rotates.
+const isApp = (req: FastifyRequest): boolean => req.headers["x-client"] === "app";
+const bodyToken = (req: FastifyRequest): string | undefined => {
+  const t = (req.body as { refreshToken?: unknown } | null | undefined)?.refreshToken;
+  return typeof t === "string" && t.length > 0 && t.length <= 300 ? t : undefined;
+};
+
+function sendTokens(req: FastifyRequest, reply: FastifyReply, t: auth.IssuedTokens, status = 200) {
+  const app = isApp(req);
+  if (!app) {
+    reply.setCookie(REFRESH_COOKIE, t.refreshToken, {
+      httpOnly: true,
+      secure: reply.server.cfg.COOKIE_SECURE === "true",
+      sameSite: "strict",
+      path: COOKIE_PATH,
+      expires: t.refreshExpiresAt,
+    });
+  }
   return reply.code(status).send({
     user: t.user,
     accessToken: t.accessToken,
     expiresIn: reply.server.cfg.ACCESS_TOKEN_TTL_SECONDS,
+    ...(app ? { refreshToken: t.refreshToken, refreshExpiresAt: t.refreshExpiresAt } : {}),
   });
 }
 
@@ -70,20 +83,20 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/register", { config: strict(5, 15, (r) => r.ip) }, async (req, reply) => {
     const body = parse(registerBody, req.body);
-    return sendTokens(reply, await auth.register(cfg, db, body, meta(req)), 201);
+    return sendTokens(req, reply, await auth.register(cfg, db, body, meta(req)), 201);
   });
 
   app.post("/login", { config: strict(10, 15, byIpAndEmail), preHandler: loginPerIp }, async (req, reply) => {
     const body = parse(loginBody, req.body);
-    return sendTokens(reply, await auth.login(cfg, db, body, meta(req)));
+    return sendTokens(req, reply, await auth.login(cfg, db, body, meta(req)));
   });
 
   app.post("/refresh", { config: strict(60, 15, (r) => r.ip) }, async (req, reply) => {
     csrfCheck(req);
-    const token = req.cookies[REFRESH_COOKIE];
+    const token = isApp(req) ? bodyToken(req) : req.cookies[REFRESH_COOKIE];
     if (!token) throw Errors.unauthenticated();
     try {
-      return sendTokens(reply, await auth.refresh(cfg, db, token, meta(req)));
+      return sendTokens(req, reply, await auth.refresh(cfg, db, token, meta(req)));
     } catch (e) {
       reply.clearCookie(REFRESH_COOKIE, { path: COOKIE_PATH });
       throw e;
@@ -92,7 +105,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/logout", async (req, reply) => {
     csrfCheck(req);
-    await auth.logout(db, req.cookies[REFRESH_COOKIE], null, false, null);
+    await auth.logout(db, isApp(req) ? bodyToken(req) : req.cookies[REFRESH_COOKIE], null, false, null);
     reply.clearCookie(REFRESH_COOKIE, { path: COOKIE_PATH });
     return reply.code(204).send();
   });

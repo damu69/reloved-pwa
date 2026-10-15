@@ -331,7 +331,55 @@ function gridHTML() {
   return F.items.map(card).join("");
 }
 function moreHTML() { var F = UI.feed; return F.next ? '<button class="btn ghost block" data-a="more" ' + (F.loading ? "disabled" : "") + ">" + (F.loading ? "Loading…" : "Load more") + "</button>" : ""; }
-function partialFeed() { var g = $("grid"), m = $("more"); if (g) g.innerHTML = gridHTML(); if (m) m.innerHTML = moreHTML(); }
+// "24 items", or "24+ items" while more can be loaded (the API pages by cursor and does not report a total).
+function countText() {
+  var F = UI.feed; if (!F.loaded || !F.items.length) return "";
+  var n = F.items.length; return n + (F.next ? "+" : "") + (n === 1 && !F.next ? " item" : " items");
+}
+function partialFeed() {
+  var g = $("grid"), m = $("more"), c = $("count"), a = $("actives"), b = $("fbtn");
+  if (g) g.innerHTML = gridHTML(); if (m) m.innerHTML = moreHTML(); if (c) c.textContent = countText(); if (a) a.innerHTML = activesHTML();
+  if (b) { var nf = filterCount(); b.textContent = "Filters" + (nf ? " (" + nf + ")" : ""); b.classList.toggle("on", UI.fil || !!nf); }
+}
+// Breadcrumbs (Home / Women / Sarees), as on Vinted and Foot Locker listing and product pages. `current` marks the last
+// category as the page itself instead of a link.
+function crumbsHTML(path, current) {
+  var out = ['<a href="/" data-a="browse" data-i="" data-j="reset">Home</a>'];
+  if (path) {
+    var segs = path.split("/"), acc = "";
+    segs.forEach(function (s, n) {
+      acc += (n ? "/" : "") + s; var c = catByPath(acc), nm = c ? c.name : s;
+      out.push(current && n === segs.length - 1 ? '<span aria-current="page">' + esc(nm) + "</span>" : '<a href="' + esc(catUrl(acc)) + '" data-a="browse" data-i="' + esc(acc) + '">' + esc(nm) + "</a>");
+    });
+  }
+  return '<nav class="crumbs" aria-label="Breadcrumb">' + out.join('<i aria-hidden="true">/</i>') + "</nav>";
+}
+function listTitle() {
+  if (UI.q.trim()) return "Results for “" + UI.q.trim() + "”";
+  if (UI.sellerId) return "Items from " + (UI.sellerName || "this seller");
+  var c = catByPath(UI.cat); return c ? c.name : "Just listed";
+}
+// Page title, result count and a visible Sort control above the grid: all three big stores have these, and Reloved
+// used to hide sorting inside the Filters panel and show no count.
+function toolbarHTML() {
+  return (UI.cat ? crumbsHTML(UI.cat, true) : "") +
+    '<div class="toolbar"><div class="tb-l"><h2 class="listtitle">' + esc(listTitle()) + '</h2><span class="count" id="count" aria-live="polite">' + countText() + "</span>" +
+    (UI.sellerId ? '<button class="chip" data-a="clearseller">Show all</button>' : "") + "</div>" +
+    '<label class="sortsel"><span>Sort</span><select class="inp" id="fs" data-f="1">' + opt("", UI.q.trim() ? "Best match" : "Newest", UI.sort) + opt("price_asc", "Price: low to high", UI.sort) + opt("price_desc", "Price: high to low", UI.sort) + "</select></label></div>" +
+    '<div class="actives" id="actives">' + activesHTML() + "</div>";
+}
+// The filters in use, each removable with one tap, plus "Clear all" (Vinted shows these under its filter row).
+function brandName(slug) { var b = (S.brands || []).filter(function (x) { return x.slug === slug; })[0]; return b ? b.name : slug; }
+function activesHTML() {
+  var out = [];
+  function ch(label, key, val) { out.push('<button class="chip on active" data-a="rmfil" data-i="' + key + '"' + (val ? ' data-j="' + esc(val) + '"' : "") + ' aria-label="Remove filter: ' + esc(label) + '">' + esc(label) + ' <span aria-hidden="true">×</span></button>'); }
+  if (UI.brand) ch(brandName(UI.brand), "brand");
+  condSet().forEach(function (k) { ch(COND[k] || k, "cond", k); });
+  if (UI.size.trim()) ch("Size " + UI.size.trim(), "size");
+  if (UI.colour) ch(UI.colour, "colour");
+  if (UI.minp || UI.maxp) ch(UI.minp && UI.maxp ? "₹" + UI.minp + " – ₹" + UI.maxp : UI.minp ? "From ₹" + UI.minp : "Up to ₹" + UI.maxp, "price");
+  return out.length ? out.join("") + '<button class="linkbtn" data-a="filclear">Clear all</button>' : "";
+}
 
 // Why buy here: one short block above the grid on the plain home screen (Vinted opens with a pitch, the big stores with a campaign).
 function introHTML() {
@@ -355,8 +403,8 @@ function loadBrands() { if (S.brands) return; S.brands = []; api.get("/catalogue
 function opt(v, label, cur) { return '<option value="' + esc(v) + '"' + (v === cur ? " selected" : "") + ">" + esc(label) + "</option>"; }
 function filtersHTML() {
   var cs = condSet();
-  return '<div class="banner filters"><div class="two"><label class="field"><span>Sort</span><select class="inp" id="fs" data-f="1">' + opt("", UI.q.trim() ? "Best match" : "Newest", UI.sort) + opt("price_asc", "Price: low to high", UI.sort) + opt("price_desc", "Price: high to low", UI.sort) + "</select></label>" +
-    '<label class="field"><span>Brand</span><select class="inp" id="fb" data-f="1">' + opt("", "Any brand", UI.brand) + (S.brands || []).map(function (b) { return opt(b.slug, b.name, UI.brand); }).join("") + "</select></label></div>" +
+  return '<div class="banner filters"><h3 class="filtitle">Filters</h3>' +
+    '<label class="field"><span>Brand</span><select class="inp" id="fb" data-f="1">' + opt("", "Any brand", UI.brand) + (S.brands || []).map(function (b) { return opt(b.slug, b.name, UI.brand); }).join("") + "</select></label>" +
     '<div class="field"><span>Condition</span><div class="chips wrap">' + Object.keys(COND).map(function (k) { var on = cs.indexOf(k) > -1; return '<button class="chip' + (on ? " on" : "") + '" data-a="condtog" data-i="' + k + '" aria-pressed="' + on + '">' + COND[k] + "</button>"; }).join("") + "</div></div>" +
     '<div class="two"><label class="field"><span>Size</span><input class="inp" id="fz" data-f="1" list="fzl" value="' + esc(UI.size) + '" placeholder="Any, e.g. M or UK 7" autocomplete="off"><datalist id="fzl">' + SIZES.map(function (s) { return '<option value="' + s + '">'; }).join("") + "</datalist></label>" +
     '<label class="field"><span>Colour</span><select class="inp" id="fcl" data-f="1">' + opt("", "Any colour", UI.colour) + COLOURS.map(function (c) { return opt(c, c, UI.colour); }).join("") + "</select></label></div>" +
@@ -367,16 +415,18 @@ V.home = function () {
   var tops = topCats(), top = UI.cat ? UI.cat.split("/")[0] : "", subs = top ? childCats(top) : [];
   function chip(path, label, on) { return '<a class="chip' + (on ? " on" : "") + '" href="' + esc(catUrl(path)) + '" data-a="cat" data-i="' + esc(path) + '">' + esc(label) + "</a>"; }
   var chips = chip("", "All", !UI.cat) + tops.map(function (c) { return chip(c.path, c.name, top === c.path); }).join("");
+  // On a laptop the category links live in the header (every page), the filters in a sidebar: fetch the brand list up front.
+  if (UI.fil || (window.matchMedia && matchMedia("(min-width:900px)").matches)) loadBrands();
   var subchips = subs.length ? '<div class="chips">' + chip(top, "All " + ((catByPath(top) || {}).name || ""), UI.cat === top) +
     subs.map(function (c) { return chip(c.path, c.name, UI.cat === c.path); }).join("") + "</div>" : "";
   var nf = filterCount(), plain = !UI.q.trim() && !UI.cat && !UI.sellerId && !nf;
   return '<div class="homehead"><h1 class="brand">Re<em>loved</em></h1>' + cartLink() + "</div>" +
-    '<div class="searchrow"><div class="search" style="flex:1"><span class="muted">&#9906;</span><input id="q" type="search" placeholder="Search for items" value="' + esc(UI.q) + '" aria-label="Search"></div><button class="chip' + (UI.fil || nf ? " on" : "") + '" data-a="fil" aria-expanded="' + UI.fil + '">Filters' + (nf ? " (" + nf + ")" : "") + "</button></div>" +
-    (UI.fil ? filtersHTML() : "") +
-    '<div class="chips">' + chips + "</div>" + subchips +
+    '<div class="searchrow"><div class="search" style="flex:1"><span class="muted">&#9906;</span><input id="q" type="search" placeholder="Search for items" value="' + esc(UI.q) + '" aria-label="Search"></div><button class="chip' + (UI.fil || nf ? " on" : "") + '" id="fbtn" data-a="fil" aria-expanded="' + UI.fil + '">Filters' + (nf ? " (" + nf + ")" : "") + "</button></div>" +
+    '<div class="chips catchips">' + chips + "</div>" + subchips +
     (plain && !UI.fil ? introHTML() : "") +
-    (UI.sellerId ? '<div class="banner" style="display:flex;gap:10px;align-items:center"><span class="small" style="flex:1">Items from <b>' + esc(UI.sellerName || "this seller") + '</b></span><button class="chip" data-a="clearseller">Show all</button></div>' : "") +
-    '<div class="grid" id="grid">' + gridHTML() + '</div><div id="more" style="margin-top:14px">' + moreHTML() + "</div>";
+    // Filters: a panel under the chips on phones (opened by the Filters button), a sidebar beside the grid on laptops.
+    '<div class="listing"><aside class="side' + (UI.fil ? " open" : "") + '" aria-label="Filters">' + filtersHTML() + "</aside>" +
+    '<div class="listing-main">' + toolbarHTML() + '<div class="grid" id="grid">' + gridHTML() + '</div><div id="more" style="margin-top:14px">' + moreHTML() + "</div></div></div>";
 };
 V.browse = function () {
   var tops = topCats();
@@ -393,16 +443,18 @@ V.item = function (pid) {
   var f = !!S.wish[pid], imgs = p.images && p.images.length ? p.images : [null];
   var off = v && v.mrpPaise > v.pricePaise ? Math.round((1 - v.pricePaise / v.mrpPaise) * 100) : 0;
   return head("", true, '<button class="back" data-a="fav" data-i="' + esc(pid) + '" aria-label="Favourite" aria-pressed="' + f + '"><span class="heart' + (f ? " on" : "") + '" style="position:static;background:none">' + HEART + "</span></button>") +
+    crumbsHTML(p.categoryPath, false) +
     '<div class="itemgrid"><div class="gallery">' + imgs.map(function (im, n) { return ph(p.title, pid, im && im.id, 1200, "", null, photoAlt(p.title, p.brandName, p.condition) + (imgs.length > 1 ? ", photo " + (n + 1) + " of " + imgs.length : "")); }).join("") + '</div><div class="iteminfo">' +
-    "<h2>" + esc(p.title) + '</h2><div class="price" style="font-size:1.2rem;margin:4px 0">' + (v ? inr(v.pricePaise) : "") + (off ? ' <s class="muted small" style="font-weight:400">' + inr(v.mrpPaise) + '</s> <small>' + off + "% off</small>" : "") + '</div><div class="muted small">Price includes GST</div>' +
+    "<h2>" + esc(p.title) + '</h2><div class="price price-lg">' + (v ? inr(v.pricePaise) : "") + (off ? ' <s class="muted small" style="font-weight:400">' + inr(v.mrpPaise) + '</s> <small>' + off + "% off</small>" : "") + '</div><div class="muted small">Price includes GST</div>' +
     (vs.length > 1 || (vs[0] && Object.keys(vs[0].options || {}).length) ? '<h3 style="margin:14px 0 6px">' + (vs.length > 1 ? "Choose an option" : "Option") + '</h3><div class="chips" style="flex-wrap:wrap">' + vs.map(function (x) { return '<button class="chip' + (v && x.id === v.id ? " on" : "") + '" data-a="vsel" data-i="' + esc(pid) + '" data-j="' + esc(x.id) + '"' + (x.inStock ? "" : ' style="opacity:.45;text-decoration:line-through"') + ">" + esc(variantLabel(x.options)) + "</button>"; }).join("") + "</div>" : "") +
     (v && v.onlyLeft ? '<div class="pill prog" style="display:inline-block">Only ' + v.onlyLeft + " left</div>" : "") +
     '<dl class="kv"><dt>Condition</dt><dd>' + esc(COND[p.condition] || p.condition) + "</dd><dt>Brand</dt><dd>" + esc(p.brandName || "Not stated") + "</dd><dt>Category</dt><dd>" + esc(p.categoryName || "") + "</dd>" +
     Object.keys(p.attributes || {}).map(function (k) { return "<dt>" + esc(k.charAt(0).toUpperCase() + k.slice(1)) + "</dt><dd>" + esc(p.attributes[k]) + "</dd>"; }).join("") + "</dl>" +
     (p.description ? "<p>" + esc(p.description).replace(/\n/g, "<br>") + "</p>" : "") +
     (p.seller ? '<button class="itemcard" data-a="seller" data-i="' + esc(p.seller.id) + '" data-j="' + esc(p.seller.displayName) + '" style="margin:12px 0"><span class="av" style="background:hsl(' + hueOf(p.seller.displayName) + ',40%,32%)">' + esc(String(p.seller.displayName).slice(0, 1).toUpperCase()) + '</span><span style="flex:1"><b>' + esc(p.seller.displayName) + '</b> <span class="pill ok">Verified seller</span><br><span class="muted small">See more from this seller</span></span><span class="chev"></span></button>' : "") +
-    '<button class="btn ghost block" data-a="msgseller" data-i="' + esc(pid) + '" style="margin-bottom:10px">Message seller</button>' +
+    // The buying action comes first, then the secondary one (Vinted: Buy now, Make an offer, Message seller).
     (v && v.inStock ? (inCart ? '<div class="two"><button class="btn ghost" data-a="tab" data-i="cart">View cart (' + inCart.quantity + ')</button><button class="btn" data-a="addcart" data-i="' + esc(v.id) + '">Add one more</button></div>' : '<button class="btn block" data-a="addcart" data-i="' + esc(v.id) + '"' + (UI.busy ? " disabled" : "") + ">Add to cart</button>") : '<div class="banner">This option is sold out.</div>') +
+    '<button class="btn ghost block" data-a="msgseller" data-i="' + esc(pid) + '" style="margin-top:10px">Message seller</button>' +
     // Only approved sellers' listings are public (the API's VISIBLE rule), so every seller shown here has been verified.
     '<div class="banner trust" style="margin-top:12px"><b>Buyer Protection</b><span class="small muted">If it arrives damaged or fake, ask for a return within 7 days of delivery. Pay inside Reloved to stay covered. Buyer Protection and delivery fees are shown before you order.</span> <a class="small" href="/home/doc/how" data-a="go" data-i="doc" data-j="how">How it works</a></div>' +
     '<p style="margin-top:6px"><button class="small muted" style="text-decoration:underline" data-a="share" data-i="' + esc(pid) + '">Share this item</button> · <button class="small muted" style="text-decoration:underline" data-a="reportitem" data-i="' + esc(pid) + '">Report this listing</button></p></div></div>';
@@ -593,11 +645,18 @@ function renderNav() {
     ["profile", "Profile", I('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>')]
   ];
   var badge = { cart: n, inbox: u };
-  nav.innerHTML = tabs.map(function (t) {
+  // Laptop header, as on Vinted, Nike and Foot Locker: logo, a search box that is on every page, the account links and a
+  // Sell button, with category links in a second row. Phones and tablets hide these (CSS) and keep the bottom tab bar.
+  var topc = UI.cat ? UI.cat.split("/")[0] : "", onHome = !stack.length && tab === "home";
+  var brandAndSearch = '<a class="navbrand" href="/" data-a="browse" data-i="" data-j="reset">Re<em>loved</em></a>' +
+    '<form class="navsearch" id="nf" role="search"><span class="muted" aria-hidden="true">&#9906;</span><input id="nq" type="search" placeholder="Search for items" aria-label="Search for items" value="' + esc(UI.q) + '"></form>';
+  var catRow = '<div class="navcats" role="navigation" aria-label="Categories"><a href="/" data-a="browse" data-i="" data-j="reset" class="' + (onHome && !UI.cat && !UI.q.trim() ? "on" : "") + '">Just listed</a>' +
+    topCats().map(function (c) { return '<a href="' + esc(catUrl(c.path)) + '" data-a="browse" data-i="' + esc(c.path) + '" class="' + (onHome && topc === c.path ? "on" : "") + '">' + esc(c.name) + "</a>"; }).join("") + "</div>";
+  nav.innerHTML = brandAndSearch + tabs.map(function (t) {
     var on = (!stack.length && tab === t[0]) || (stack.length && t[0] === "inbox" && cur().v === "chat");
     // Cart is hidden from the phone tab bar by CSS (it sits in the home header there) and shown in the desktop top bar.
     return '<button data-a="tab" data-i="' + t[0] + '" class="t-' + t[0] + (on ? " on" : "") + '" aria-label="' + t[1] + '">' + t[2] + "<span>" + t[1] + "</span>" + (badge[t[0]] ? '<i class="dot">' + (badge[t[0]] > 9 ? "9+" : badge[t[0]]) + "</i>" : "") + "</button>";
-  }).join("");
+  }).join("") + catRow;
 }
 // The tab title and canonical address follow the screen. Item and category pages also get these in the first HTML
 // from the server (api/page.js), for search engines and link previews that do not run scripts.
@@ -655,7 +714,13 @@ async function act(a, i, j, el) {
     }
     case "item": go("item", i); return;
     case "cat": UI.cat = i; navPush(); loadFeed(false); render(); return;
-    case "browse": UI.cat = i; stack = []; tab = "home"; navPush(); loadFeed(false); render(); return;
+    case "browse": UI.cat = i; if (j === "reset") { UI.q = ""; UI.sellerId = ""; UI.sellerName = ""; } stack = []; tab = "home"; navPush(); loadFeed(false); render(); return;
+    case "rmfil": {
+      if (i === "cond") { var cs2 = condSet(), at2 = cs2.indexOf(j); if (at2 > -1) cs2.splice(at2, 1); UI.cond = cs2.join(","); }
+      else if (i === "price") UI.minp = UI.maxp = "";
+      else UI[i] = "";
+      loadFeed(false); render(); return;
+    }
     case "fil": UI.fil = !UI.fil; if (UI.fil) loadBrands(); render(); return;
     case "condtog": { var cs = condSet(), at = cs.indexOf(i); if (at > -1) cs.splice(at, 1); else cs.push(i); UI.cond = cs.join(","); loadFeed(false); render(); return; }
     case "filclear": UI.cond = UI.brand = UI.size = UI.colour = UI.minp = UI.maxp = ""; UI.sort = ""; loadFeed(false); render(); return;
@@ -780,16 +845,16 @@ document.addEventListener("click", function (ev) {
 });
 document.addEventListener("submit", function (ev) {
   if (ev.target.id === "af") { ev.preventDefault(); submitAuth(); }
-  else if (ev.target.id === "bf") { ev.preventDefault(); UI.q = val("q2"); UI.cat = ""; stack = []; tab = "home"; navPush(); loadFeed(false); render(); }
+  else if (ev.target.id === "bf" || ev.target.id === "nf") { ev.preventDefault(); UI.q = val(ev.target.id === "nf" ? "nq" : "q2"); UI.cat = ""; UI.sellerId = ""; UI.sellerName = ""; stack = []; tab = "home"; navPush(); loadFeed(false); render(); }
 });
 var searchT;
 document.addEventListener("input", function (ev) {
   if (ev.target.id === "q") { clearTimeout(searchT); searchT = setTimeout(function () { UI.q = ev.target.value; loadFeed(false); syncUrl(); docHead(); }, 350); }
 });
 document.addEventListener("change", function (ev) {
-  var t = ev.target;
+  var t = ev.target, FIELD = { fs: "sort", fb: "brand", fz: "size", fcl: "colour", fmin: "minp", fmax: "maxp" };
   if (t.dataset && t.dataset.f) {
-    UI.sort = val("fs"); UI.brand = val("fb"); UI.size = val("fz"); UI.colour = val("fcl"); UI.minp = val("fmin"); UI.maxp = val("fmax");
+    if (FIELD[t.id]) UI[FIELD[t.id]] = t.value.trim(); // only the control that changed, so closed or hidden filters are never wiped
     clearTimeout(searchT); searchT = setTimeout(function () { loadFeed(false); }, 200);
   } else if (t.dataset && t.dataset.delv) {
     api.put("/cart/delivery/" + t.dataset.delv, { code: t.value }).then(function (r) { S.cart = r; render(); }, function (e) { toast(errText(e)); loadCart().then(render); });

@@ -39,6 +39,10 @@ h1{font-size:1.9rem;line-height:1.1} h2{font-size:1.45rem;line-height:1.15} h3{f
 .btn.sm{padding:7px 12px;font-size:.85rem}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
 .card{min-width:0;text-align:left;display:block;width:100%}
+a.card,a.chip{color:inherit;text-decoration:none} a.chip{color:var(--muted)} a.chip.on{color:var(--bg)}
+/* plain copy of an item or category that the server puts in the first HTML (api/page.js); the app replaces it on start */
+.ssr{max-width:760px} .ssr a{color:var(--accent)} .ssr h1{margin:6px 0 10px} .ssr img{display:block;width:100%;height:auto;border-radius:6px;margin-bottom:10px}
+.ssr p{margin:0 0 8px} .ssr ul{padding-left:18px;line-height:1.7}
 .ph{aspect-ratio:3/4;border-radius:6px;position:relative;display:grid;place-items:center;color:#fff;overflow:hidden;background-size:cover;background-position:center}
 .ph .phi{width:44%;max-width:150px;color:rgba(242,236,227,.42);pointer-events:none}
 .ph .tag{position:absolute;left:8px;top:8px;background:rgba(0,0,0,.62);color:#fff;font:600 .7rem var(--f-body);padding:3px 8px;border-radius:4px;letter-spacing:.03em}

@@ -3,24 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Reloved Marketplace</title>
+<!-- Item and category addresses are served through api/page.js, which replaces the title, description, canonical and
+     preview tags below (keep them on one line each) and puts the item's text into #main for search engines. Paths are
+     absolute because the same page is served at /item/<id>/<slug>, /c/<path> and so on. -->
+<title>Reloved: preloved fashion and more from verified Indian sellers</title>
+<meta name="description" content="Buy and sell preloved kurtas, sarees, sneakers, bags and more from verified sellers across India. Buyer Protection on every order.">
+<link rel="canonical" href="https://reloved-pwa.vercel.app/">
+<meta property="og:site_name" content="Reloved">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Reloved: preloved fashion and more from verified Indian sellers">
+<meta property="og:description" content="Buy and sell preloved kurtas, sarees, sneakers, bags and more from verified sellers across India. Buyer Protection on every order.">
+<meta property="og:url" content="https://reloved-pwa.vercel.app/">
+<meta property="og:image" content="https://reloved-pwa.vercel.app/icon-512.png">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#151311">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <div id="app"><main id="main"><div class="loading">Loading marketplace&hellip;</div></main><nav class="nav" id="nav" aria-label="Main" hidden></nav></div>
-<script src="config.js"></script>
-<script src="api.js"></script>
-<script src="app.js"></script>
-<script src="swipe.js"></script>
-<script src="safety.js"></script>
+<script src="/config.js"></script>
+<script src="/api.js"></script>
+<script src="/app.js"></script>
+<script src="/swipe.js"></script>
+<script src="/safety.js"></script>
 <!-- seller.js, admin.js and the Nova help chat load on demand from app.js (loadScript). -->
-
 </body>
 </html>

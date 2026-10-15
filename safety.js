@@ -53,7 +53,7 @@ V.delacct = function () {
 async function sendDelete() {
   var p = $("da_p").value; if (!p) return say("da_err", "Enter your password.");
   var btn = document.querySelector("#daf button[type=submit]"); busy(btn, true, "Delete my account");
-  try { await api.post("/me/delete", { password: p }); toast("Your account has been deleted."); setTimeout(function () { location.href = location.pathname; }, 900); }
+  try { await api.post("/me/delete", { password: p }); toast("Your account has been deleted."); setTimeout(function () { location.href = "/"; }, 900); }
   catch (x) { busy(btn, false, "Delete my account"); say("da_err", x.code === "INVALID_CREDENTIALS" ? "That password is not correct." : errText(x)); }
 }
 

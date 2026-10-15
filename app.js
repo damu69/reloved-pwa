@@ -182,7 +182,7 @@ async function loadFeed(more) {
   try {
     var r = await api.get(feedUrl(more ? F.next : null), { anon: !signedIn() });
     if (my !== feedSeq) return; // a newer search replaced this one
-    (r.items || []).forEach(function (i) { PCAT[i.id] = i.categoryPath; }); F.items = more ? F.items.concat(r.items) : r.items; F.next = r.nextCursor || null; F.loaded = true;
+    (r.items || []).forEach(function (i) { PCAT[i.id] = i.categoryPath; PTITLE[i.id] = i.title; }); F.items = more ? F.items.concat(r.items) : r.items; F.next = r.nextCursor || null; F.loaded = true;
   } catch (e) { if (my !== feedSeq) return; F.error = errText(e); }
   F.loading = false; partialFeed();
 }
@@ -194,6 +194,64 @@ function need(key, fn) {
   return c;
 }
 function drop(prefix) { Object.keys(C).forEach(function (k) { if (k.indexOf(prefix) === 0) delete C[k]; }); }
+
+/* ============ addresses ============ */
+// Every screen has its own address, so an item, a category or a search can be shared, bookmarked and found by search engines:
+//   /item/<id>/<slug>   /c/<category path>   /search?q=…&c=…   /seller/<id>   /<tab>   /<tab>/<screen>/<param>
+// The router keeps the in-memory stack as the source of truth; render() writes it to the address bar, popstate reads it back.
+var PTITLE = {}; // product id -> title, learned from the feed and item pages, for readable item addresses
+var TAB_NAMES = ["home", "discover", "sell", "inbox", "cart", "profile"];
+var NO_URL = { reset: 1 }; // the password reset screen's parameter is a secret token: never put it in the address or history
+var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function slug(s) { return String(s || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60); }
+function itemUrl(id, title) {
+  var s = slug(title || PTITLE[id]), base = "/item/" + id;
+  if (!s && location.pathname.indexOf(base + "/") === 0) return location.pathname; // opened from a link: keep its slug until the title is known
+  return base + (s ? "/" + s : "");
+}
+function catUrl(path) { return path ? "/c/" + path : "/"; }
+function urlFor() {
+  var st = stack.filter(function (s) { return !NO_URL[s.v]; }), c = st[st.length - 1];
+  if (c && c.v === "item") return itemUrl(c.p);
+  if (c) return "/" + tab + "/" + c.v + (c.p ? "/" + encodeURIComponent(c.p) : "");
+  if (tab !== "home") return "/" + tab;
+  if (UI.q.trim()) return "/search?q=" + encodeURIComponent(UI.q.trim()) + (UI.cat ? "&c=" + encodeURIComponent(UI.cat) : "");
+  if (UI.sellerId) return "/seller/" + UI.sellerId;
+  return catUrl(UI.cat);
+}
+function parseUrl() {
+  var parts = location.pathname.split("/").filter(Boolean).map(function (x) { try { return decodeURIComponent(x); } catch (e) { return ""; } });
+  var qs = new URLSearchParams(location.search), st = { tab: "home", stack: [], q: "", cat: "", sellerId: "", sellerName: "" };
+  if (parts[0] === "item" && UUID_RE.test(parts[1] || "")) st.stack = [{ v: "item", p: parts[1] }];
+  else if (parts[0] === "c") st.cat = parts.slice(1).filter(function (x) { return /^[a-z0-9-]+$/.test(x); }).join("/");
+  else if (parts[0] === "search") { st.q = (qs.get("q") || "").slice(0, 200); st.cat = qs.get("c") || ""; }
+  else if (parts[0] === "seller" && UUID_RE.test(parts[1] || "")) st.sellerId = parts[1];
+  else if (TAB_NAMES.indexOf(parts[0]) > -1) { st.tab = parts[0]; if (/^[a-z]+$/.test(parts[1] || "") && !NO_URL[parts[1]]) st.stack = [{ v: parts[1], p: parts[2] }]; }
+  return st;
+}
+var depth = 0, pushNext = false; // depth: entries this visit pushed, so the in-app back button can use history.back()
+function snap() { return { tab: tab, stack: stack.map(function (s) { return { v: s.v, p: s.p }; }), q: UI.q, cat: UI.cat, sellerId: UI.sellerId, sellerName: UI.sellerName, d: depth }; }
+function restore(st) {
+  var fk = feedKey();
+  tab = st.tab; stack = st.stack.slice(); UI.q = st.q || ""; UI.cat = st.cat || ""; UI.sellerId = st.sellerId || ""; UI.sellerName = st.sellerName || ""; depth = st.d || 0; UI.confirm = null;
+  return fk !== feedKey();
+}
+// Called at the end of every render: a navigation marked with navPush() adds a history entry, anything else (typing a
+// search, a filter, an item's title arriving) just updates the current one.
+function syncUrl() {
+  var u = urlFor(), here = location.pathname + location.search;
+  try {
+    if (pushNext && u !== here) { depth++; history.pushState(snap(), "", u); }
+    else history.replaceState(snap(), "", u);
+  } catch (e) { }
+  pushNext = false;
+}
+function navPush() { pushNext = true; }
+window.addEventListener("popstate", function (e) {
+  if (!S.ready) return;
+  var feedChanged = restore(e.state || parseUrl()), c = cur();
+  enter(c.v, c.p); if (feedChanged) loadFeed(false); render();
+});
 
 /* ============ scripts loaded on demand ============ */
 var scripts = {};
@@ -208,7 +266,7 @@ function loadScript(src, attrs) {
 }
 // Seller and admin screens are fetched only when someone opens one, so shoppers never download them.
 // admin.js uses helpers from seller.js (RL.H), so seller.js always runs first.
-var MODS = { seller: ["seller.js"], admin: ["seller.js", "admin.js"] }, MOD_OF = {}, modState = {}; // modState: name -> "loading" | "ok" | "err"
+var MODS = { seller: ["/seller.js"], admin: ["/seller.js", "/admin.js"] }, MOD_OF = {}, modState = {}; // modState: name -> "loading" | "ok" | "err"
 "sell slbank slearn slform slorder slorders slprod slprods".split(" ").forEach(function (v) { MOD_OF[v] = "seller"; });
 "admin adcat adcomm adcoupons adfees adorder adorders adprod adprods adrules adseller adsellers adusers".split(" ").forEach(function (v) { MOD_OF[v] = "admin"; });
 function loadMod(name) {
@@ -242,9 +300,10 @@ function watchNova(origin) {
 var V = {};
 function card(i) {
   var f = !!S.wish[i.id], tag = i.inStock === false ? '<span class="tag">Sold out</span>' : "";
-  return '<div><button class="card" data-a="item" data-i="' + esc(i.id) + '" aria-label="' + esc(i.title) + '">' +
+  // A real link, so search engines and the site crawler can follow it and people can open it in a new tab.
+  return '<div><a class="card" href="' + esc(itemUrl(i.id, i.title)) + '" data-a="item" data-i="' + esc(i.id) + '" aria-label="' + esc(i.title) + '">' +
     ph(i.title, i.id, i.coverImageId, 600, tag + '<span class="heart' + (f ? " on" : "") + '" data-a="fav" data-i="' + esc(i.id) + '" role="button" aria-label="Favourite" aria-pressed="' + f + '">' + HEART + "</span>") +
-    '<div class="t">' + esc(i.title) + '</div><div class="m">' + esc(COND[i.condition] || i.condition || "") + " · " + esc(i.brandName || "No brand") + '</div><div class="price">' + inr(i.minPricePaise) + "</div></button></div>";
+    '<div class="t">' + esc(i.title) + '</div><div class="m">' + esc(COND[i.condition] || i.condition || "") + " · " + esc(i.brandName || "No brand") + '</div><div class="price">' + inr(i.minPricePaise) + "</div></a></div>";
 }
 function gridHTML() {
   var F = UI.feed;
@@ -258,10 +317,10 @@ function partialFeed() { var g = $("grid"), m = $("more"); if (g) g.innerHTML = 
 
 V.home = function () {
   var tops = topCats(), top = UI.cat ? UI.cat.split("/")[0] : "", subs = top ? childCats(top) : [];
-  var chips = '<button class="chip' + (!UI.cat ? " on" : "") + '" data-a="cat" data-i="">All</button>' +
-    tops.map(function (c) { return '<button class="chip' + (top === c.path ? " on" : "") + '" data-a="cat" data-i="' + esc(c.path) + '">' + esc(c.name) + "</button>"; }).join("");
-  var subchips = subs.length ? '<div class="chips"><button class="chip' + (UI.cat === top ? " on" : "") + '" data-a="cat" data-i="' + esc(top) + '">All ' + esc((catByPath(top) || {}).name || "") + "</button>" +
-    subs.map(function (c) { return '<button class="chip' + (UI.cat === c.path ? " on" : "") + '" data-a="cat" data-i="' + esc(c.path) + '">' + esc(c.name) + "</button>"; }).join("") + "</div>" : "";
+  function chip(path, label, on) { return '<a class="chip' + (on ? " on" : "") + '" href="' + esc(catUrl(path)) + '" data-a="cat" data-i="' + esc(path) + '">' + esc(label) + "</a>"; }
+  var chips = chip("", "All", !UI.cat) + tops.map(function (c) { return chip(c.path, c.name, top === c.path); }).join("");
+  var subchips = subs.length ? '<div class="chips">' + chip(top, "All " + ((catByPath(top) || {}).name || ""), UI.cat === top) +
+    subs.map(function (c) { return chip(c.path, c.name, UI.cat === c.path); }).join("") + "</div>" : "";
   return '<div class="brand">Re<em>loved</em></div><div style="display:flex;gap:8px;margin-bottom:12px"><div class="search" style="flex:1"><span class="muted">&#9906;</span><input id="q" type="search" placeholder="Search for items" value="' + esc(UI.q) + '" aria-label="Search"></div><button class="chip' + (UI.fil ? " on" : "") + '" data-a="fil">Filters</button></div>' +
     (UI.fil ? '<div class="banner"><div class="two"><label class="field"><span>Sort</span><select class="inp" id="fs" data-f="1"><option value="">' + (UI.q.trim() ? "Best match" : "Newest") + '</option><option value="price_asc"' + (UI.sort === "price_asc" ? " selected" : "") + '>Price: low to high</option><option value="price_desc"' + (UI.sort === "price_desc" ? " selected" : "") + '>Price: high to low</option></select></label>' +
       '<label class="field"><span>Condition</span><select class="inp" id="fc" data-f="1"><option value="">Any</option>' + Object.keys(COND).map(function (k) { return '<option value="' + k + '"' + (UI.cond === k ? " selected" : "") + ">" + COND[k] + "</option>"; }).join("") + "</select></label></div>" +
@@ -279,7 +338,7 @@ V.item = function (pid) {
   var c = need("item:" + pid, function () { return api.get("/catalogue/products/" + pid, { anon: !signedIn() }); });
   if (c.st === "loading") return head("", true) + loadingBox();
   if (c.st === "err") return head("Item", true) + (c.code === "NOT_FOUND" ? '<div class="empty"><h2>Item not found</h2>It may have been removed or is no longer for sale.</div>' : failBox(c.err));
-  var p = c.data, vs = p.variants || [], sel = UI.pdv[pid]; PCAT[pid] = p.categoryPath;
+  var p = c.data, vs = p.variants || [], sel = UI.pdv[pid]; PCAT[pid] = p.categoryPath; PTITLE[pid] = p.title;
   var v = vs.filter(function (x) { return x.id === sel; })[0] || vs.filter(function (x) { return x.inStock; })[0] || vs[0];
   var inCart = v && S.cart && S.cart.items.filter(function (i) { return i.variantId === v.id; })[0];
   var f = !!S.wish[pid], imgs = p.images && p.images.length ? p.images : [null];
@@ -459,11 +518,14 @@ function render() {
   if (mod && modState[mod] !== "ok") {
     loadMod(mod);
     main.innerHTML = head("", stack.length > 0) + (modState[mod] === "err" ? failBox("Check your connection and try again.", "modretry") : loadingBox()); main.dataset.v = "";
-    nav.hidden = false; renderNav(); return;
+    nav.hidden = false; renderNav(); syncUrl(); return;
   }
+  // Opened from a link: keep the server's copy of the item on screen until the app has the item, instead of "Loading…".
+  var pending = v === "item" && C["item:" + c.p] && C["item:" + c.p].st === "loading";
+  if (pending && main.querySelector(".ssr")) { nav.hidden = false; renderNav(); return; }
   main.innerHTML = (V[v] || V.home)(c.p); main.dataset.v = v + ":" + (c.p || "");
   nav.hidden = v === "auth";
-  renderNav();
+  renderNav(); syncUrl(); docHead();
   if (same) main.scrollTop = keep;
   if (window.RL) RL.hooks.forEach(function (f) { try { f(); } catch (e) { } });
 }
@@ -484,6 +546,18 @@ function renderNav() {
     return '<button data-a="tab" data-i="' + t[0] + '" class="' + (on ? "on" : "") + '" aria-label="' + t[1] + '">' + t[2] + "<span>" + t[1] + "</span>" + (badge[t[0]] ? '<i class="dot">' + (badge[t[0]] > 9 ? "9+" : badge[t[0]]) + "</i>" : "") + "</button>";
   }).join("");
 }
+// The tab title and canonical address follow the screen. Item and category pages also get these in the first HTML
+// from the server (api/page.js), for search engines and link previews that do not run scripts.
+var SITE_TITLE = "Reloved: preloved fashion and more from verified Indian sellers";
+function docHead() {
+  var c = cur(), t = SITE_TITLE, cat = catByPath(UI.cat);
+  if (c.v === "item" && !PTITLE[c.p]) return; // still loading: keep the title the server sent
+  if (c.v === "item") t = PTITLE[c.p] + " | Reloved";
+  else if (!stack.length && tab === "home") t = UI.q.trim() ? "“" + UI.q.trim() + "” | Reloved" : UI.sellerId ? (UI.sellerName || "Seller") + " | Reloved" : cat ? "Preloved " + cat.name + " | Reloved" : SITE_TITLE;
+  document.title = t;
+  var canon = document.querySelector('link[rel="canonical"]');
+  if (canon) canon.href = (window.APP_CONFIG.CANONICAL || location.origin) + urlFor();
+}
 function refresh() { if (typing()) { dirty = true; return; } render(); }
 document.addEventListener("focusout", function () { setTimeout(function () { if (dirty && !typing()) render(); }, 50); });
 function enter(v, p) {
@@ -497,9 +571,16 @@ function enter(v, p) {
   if (v === "home" && !UI.feed.loaded) loadFeed(false);
   if (window.RL && RL.E && RL.E[v]) RL.E[v](p);
 }
-function go(v, p) { UI.confirm = null; stack.push({ v: v, p: p }); enter(v, p); render(); $("main").scrollTop = 0; }
-function setTab(t) { stack = []; tab = t; UI.confirm = null; enter(t); render(); $("main").scrollTop = 0; }
-function back() { UI.confirm = null; stack.pop(); render(); }
+function go(v, p) { UI.confirm = null; navPush(); stack.push({ v: v, p: p }); enter(v, p); render(); $("main").scrollTop = 0; }
+function setTab(t) { stack = []; tab = t; UI.confirm = null; navPush(); enter(t); render(); $("main").scrollTop = 0; }
+// If this visit pushed the current entry, step back through the browser history so its Back button stays in step;
+// popstate then restores the previous screen. Otherwise (opened from a link) just drop the top screen.
+function back() {
+  UI.confirm = null;
+  if (depth > 0 && history.state && history.state.d === depth) { history.back(); return; }
+  stack.pop(); render();
+}
+function replace(v, p) { UI.confirm = null; stack.pop(); stack.push({ v: v, p: p }); enter(v, p); render(); $("main").scrollTop = 0; }
 function afterAuth() { if (cur().v === "auth") stack.pop(); drop(""); S.ready = true; render(); if (tab === "home" || !UI.feed.loaded) loadFeed(false); }
 
 /* ============ actions ============ */
@@ -512,13 +593,13 @@ async function act(a, i, j, el) {
     case "modretry": Object.keys(modState).forEach(function (k) { if (modState[k] === "err") delete modState[k]; }); render(); return;
     case "nova": openHelpChat(); return;
     case "item": go("item", i); return;
-    case "cat": UI.cat = i; loadFeed(false); render(); return;
-    case "browse": UI.cat = i; stack = []; tab = "home"; loadFeed(false); render(); return;
+    case "cat": UI.cat = i; navPush(); loadFeed(false); render(); return;
+    case "browse": UI.cat = i; stack = []; tab = "home"; navPush(); loadFeed(false); render(); return;
     case "fil": UI.fil = !UI.fil; render(); return;
     case "more": loadFeed(true); return;
     case "feedretry": loadFeed(UI.feed.items.length > 0); return;
-    case "seller": UI.sellerId = i; UI.sellerName = j; UI.cat = ""; UI.q = ""; stack = []; tab = "home"; loadFeed(false); render(); return;
-    case "clearseller": UI.sellerId = ""; UI.sellerName = ""; loadFeed(false); render(); return;
+    case "seller": UI.sellerId = i; UI.sellerName = j; UI.cat = ""; UI.q = ""; stack = []; tab = "home"; navPush(); loadFeed(false); render(); return;
+    case "clearseller": UI.sellerId = ""; UI.sellerName = ""; navPush(); loadFeed(false); render(); return;
     case "vsel": UI.pdv[i] = j; render(); return;
     case "fav": {
       if (!signedIn()) { toast("Sign in to save favourites"); go("auth"); return; }
@@ -629,16 +710,18 @@ async function submitAuth() {
 document.addEventListener("click", function (ev) {
   var el = ev.target.closest && ev.target.closest("[data-a]");
   if (!el) return;
+  // Ctrl/Cmd/Shift-click on a real link opens it in a new tab or window, as people expect.
+  if (el.tagName === "A" && (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey)) return;
   ev.preventDefault();
   act(el.dataset.a, el.dataset.i, el.dataset.j, el).catch(function (e) { toast(errText(e)); });
 });
 document.addEventListener("submit", function (ev) {
   if (ev.target.id === "af") { ev.preventDefault(); submitAuth(); }
-  else if (ev.target.id === "bf") { ev.preventDefault(); UI.q = val("q2"); UI.cat = ""; stack = []; tab = "home"; loadFeed(false); render(); }
+  else if (ev.target.id === "bf") { ev.preventDefault(); UI.q = val("q2"); UI.cat = ""; stack = []; tab = "home"; navPush(); loadFeed(false); render(); }
 });
 var searchT;
 document.addEventListener("input", function (ev) {
-  if (ev.target.id === "q") { clearTimeout(searchT); searchT = setTimeout(function () { UI.q = ev.target.value; loadFeed(false); }, 350); }
+  if (ev.target.id === "q") { clearTimeout(searchT); searchT = setTimeout(function () { UI.q = ev.target.value; loadFeed(false); syncUrl(); docHead(); }, 350); }
 });
 document.addEventListener("change", function (ev) {
   var t = ev.target;
@@ -653,18 +736,27 @@ document.addEventListener("change", function (ev) {
 /* ============ boot ============ */
 api.onLogout(function () { clearSession(); toast("Please sign in again"); stack = []; render(); });
 async function boot() {
-  $("main").innerHTML = '<div class="loading">Loading marketplace…</div>';
-  if ("serviceWorker" in navigator && !(window.api && window.api.isApp)) navigator.serviceWorker.register("sw.js").catch(function () {});
+  if ("serviceWorker" in navigator && !(window.api && window.api.isApp)) navigator.serviceWorker.register("/sw.js").catch(function () {});
+  restore(parseUrl()); // open the screen the address names (a shared item, a category, a search…)
+  var first = cur();
+  // A shared item link: start fetching the item now, alongside the categories, rather than after them.
+  if (first.v === "item") need("item:" + first.p, function () { return api.get("/catalogue/products/" + first.p, { anon: true }); });
   var cats = loadCats();
   // No session to restore: fetch the products right away, next to the categories, instead of after a refresh that would fail.
-  if (!api.mayHaveSession()) { loadFeed(false); await cats; S.ready = true; render(); return; }
+  if (!api.mayHaveSession()) { loadFeed(false); await cats; S.ready = true; start(); return; }
   var ok = await api.restore();
   if (ok) { try { await loadMe(); } catch (e) { clearSession(); } }
   await cats;
-  S.ready = true; render(); loadFeed(false);
+  S.ready = true; start(); loadFeed(false);
+}
+function start() {
+  var c = cur();
+  if (c.v === "item") { if (signedIn() && !S.cart) loadCart().then(refresh); } // the item itself is already loading (boot)
+  else if (c.v !== "home") enter(c.v, c.p);
+  render();
 }
 window.RL = { V: V, A: {}, E: {}, PCAT: PCAT, paintNav: renderNav, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
-  current: function () { return cur(); }, canBack: function () { return stack.length > 0; }, replace: function (v, p) { stack.pop(); go(v, p); } };
+  current: function () { return cur(); }, canBack: function () { return stack.length > 0; }, replace: replace, itemUrl: itemUrl };
 boot();
 window.__reloved = { S: S, UI: UI };
 })();

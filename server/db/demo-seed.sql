@@ -84,7 +84,7 @@ begin
     ('bombay-closet','women/dresses','H&M','Black bodycon party dress','Stretch jersey, knee length, hidden zip at the back. Washed gently, still very black.','good',600,1799,500,'Black','{S,M}'::text[],1),
     ('bombay-closet','women/tops','Forever 21','Champagne satin cami top','Silky satin with thin straps and a lace trim. Looks good under a blazer or on its own.','new',380,1299,500,'Champagne','{S,M,L}'::text[],2),
     ('bombay-closet','bags/handbags','Lavie','Tan faux-leather tote bag','Roomy tote with an inside zip pocket and magnetic closure. Fits a 13 inch laptop. Light wear on the corners.','good',750,2499,1800,'Tan',null,1),
-    ('bombay-closet','footwear/heels','Aldo','Nude block heels, size 38','Comfortable 7 cm block heel with an ankle strap. Worn three times indoors, soles are clean.','very_good',900,3999,500,'Nude','{EU 38}'::text[],1),
+    ('bombay-closet','footwear/heels','Aldo','Nude block heels','Comfortable 7 cm block heel with an ankle strap. Worn three times indoors, soles are clean.','very_good',900,3999,500,'Nude','{EU 38}'::text[],1),
     ('bombay-closet','men/jackets','Levis','Denim trucker jacket','Classic mid-wash denim, button front, two chest pockets. The one jacket that goes with everything.','very_good',1800,5999,500,'Mid blue','{M,L}'::text[],1),
     ('bombay-closet','accessories/sunglasses',null,'Gold-frame aviator sunglasses','Polarised lenses with UV protection. Light scratches on the case only, lenses are clean.','good',650,1499,1800,'Gold',null,1),
 
@@ -93,12 +93,12 @@ begin
     ('kochi-thrift','women/tops','W','Printed peplum top','Soft crepe with a floral print and a flattering peplum hem. Machine washable.','good',420,1599,500,'Pink floral','{M,L}'::text[],1),
     ('kochi-thrift','kids/clothing','H&M','Kids denim dungarees, 4 to 5 years','Soft stretch denim with adjustable straps. Outgrown after two months, hardly any wear.','very_good',450,1499,500,'Denim',null,1),
     ('kochi-thrift','home/decor',null,'Brass diya set of 4, hand polished','Traditional brass diyas, polished and ready to light. A lovely Diwali gift.','new',550,1200,1800,'Brass',null,3),
-    ('kochi-thrift','footwear/sneakers','Adidas','Adidas Grand Court sneakers, UK 7','White leather-look sneakers with the three stripes. Cleaned and deodorised. Minor creasing.','good',1300,4999,500,'White','{UK 7}'::text[],1),
+    ('kochi-thrift','footwear/sneakers','Adidas','Adidas Grand Court sneakers','White leather-look sneakers with the three stripes. Cleaned and deodorised. Minor creasing.','good',1300,4999,500,'White','{UK 7}'::text[],1),
 
     ('hyderabad-hanger','men/tshirts','Nike','Nike Dri-FIT running tee','Moisture-wicking black tee with a small swoosh. Used for a few gym sessions only.','very_good',600,2495,500,'Black','{M,L,XL}'::text[],1),
     ('hyderabad-hanger','men/jeans','Levis','Levis 511 slim jeans, dark wash','Slim fit through the thigh, stretch denim. Hemmed for a 30 inch length. No rips or stains.','good',1400,4499,500,'Dark blue','{30,32,34}'::text[],1),
     ('hyderabad-hanger','men/shirts','Van Heusen','White cotton formal shirt','Crisp white cotton with a spread collar. Bought two of the same, this one is unworn.','new',700,1799,500,'White','{40,42}'::text[],2),
-    ('hyderabad-hanger','footwear/sneakers','Puma','Puma RS-X sneakers, white and grey, UK 9','Chunky retro runners with a cushioned sole. Wear on the heel tabs, otherwise clean.','good',2200,8999,500,'White and grey','{UK 9}'::text[],1),
+    ('hyderabad-hanger','footwear/sneakers','Puma','Puma RS-X sneakers, white and grey','Chunky retro runners with a cushioned sole. Wear on the heel tabs, otherwise clean.','good',2200,8999,500,'White and grey','{UK 9}'::text[],1),
     ('hyderabad-hanger','bags/backpacks','Wildcraft','Wildcraft 35L trekking backpack','Rain cover included, padded straps and a hip belt. Used on two treks. Zips all work smoothly.','good',1100,3200,1800,'Navy',null,1),
     ('hyderabad-hanger','accessories/watches','Fossil','Fossil chronograph, brown leather strap','Quartz chronograph with a tan dial. New battery fitted. Strap shows light creasing.','very_good',3200,9995,1800,'Brown',null,1),
 
@@ -107,7 +107,7 @@ begin
     ('pune-preloved','women/tops','H&M','Oversized striped shirt','Roomy cotton shirt in blue and white stripes. Great with jeans or over a swimsuit.','good',500,1499,500,'Blue stripe','{S,M}'::text[],1),
     ('pune-preloved','men/jackets','Zara','Olive bomber jacket','Lightweight bomber with ribbed cuffs and zip pockets. Warm enough for a Pune winter evening.','very_good',1600,4990,500,'Olive','{M,L}'::text[],1),
     ('pune-preloved','kids/clothing',null,'Girls cotton frock, 6 to 7 years','Bright yellow frock with a ruffled hem, soft lining. Washed many times, still looks fresh.','good',300,899,500,'Yellow',null,1),
-    ('pune-preloved','footwear/flats',null,'Hand-stitched Kolhapuri sandals, size 7','Genuine leather Kolhapuris from Kolhapur. Softened already so no blisters.','new',650,1200,500,'Tan',null,2),
+    ('pune-preloved','footwear/flats',null,'Hand-stitched Kolhapuri sandals','Genuine leather Kolhapuris from Kolhapur. Softened already so no blisters.','new',650,1200,500,'Tan','{UK 7}'::text[],2),
 
     ('calicut-closet','women/kurtas','W','White chikankari kurta','Delicate hand embroidery on soft cotton. Straight cut with side slits. Dry cleaned.','very_good',900,2599,500,'White','{S,M,L}'::text[],1),
     ('calicut-closet','women/sarees',null,'Mustard linen saree with ikat border','Handloom linen with a contrast ikat pallu. Light and perfect for hot days.','very_good',1700,3800,500,'Mustard',null,1),
@@ -119,7 +119,7 @@ begin
     ('delhi-drops','women/dresses','Mango','Black satin slip dress','Bias-cut satin with a cowl neck and adjustable straps. New with tags, wrong size for me.','new_with_tags',1500,3999,500,'Black','{S,M}'::text[],1),
     ('delhi-drops','men/jackets','Raymond','Raymond navy wool blazer','Single-breasted, two button, notch lapel. Professionally pressed. Fits like a 40.','good',2600,9999,500,'Navy','{38,40}'::text[],1),
     ('delhi-drops','men/tshirts','H&M','Vintage wash graphic tee','Faded black cotton with a retro print. Soft from washing, small bobbling under the arms.','satisfactory',250,799,500,'Washed black','{M,L}'::text[],1),
-    ('delhi-drops','footwear/sneakers','Nike','Nike Air Max 90, UK 8','Iconic Air Max with visible air unit. Midsole shows some yellowing, uppers are clean.','good',3600,11995,500,'White and red','{UK 8}'::text[],1),
+    ('delhi-drops','footwear/sneakers','Nike','Nike Air Max 90','Iconic Air Max with visible air unit. Midsole shows some yellowing, uppers are clean.','good',3600,11995,500,'White and red','{UK 8}'::text[],1),
     ('delhi-drops','bags/backpacks',null,'Canvas laptop backpack, 15 inch','Padded laptop sleeve, two side pockets and a hidden back pocket. Sturdy zips.','very_good',600,1699,1800,'Olive',null,1),
 
     ('jaipur-jhola','women/kurtas',null,'Jaipuri hand-block printed cotton kurta','Pure cotton in a floral block print, straight fit. Straight from a Jaipur workshop, never worn.','new',520,999,500,'Red and white','{S,M,L}'::text[],2),

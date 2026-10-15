@@ -244,3 +244,18 @@ describe("scale", () => {
     expect((await get("/products?q=blouses&limit=1")).json().items.length).toBe(1);
   }, 120_000);
 });
+
+describe("size and colour filters", () => {
+  it("matches a variant's size option in any case, and colour words inside the free-text colour", async () => {
+    const id = await product({ title: "Bandhgala sherwani", price: 2500, cat: kurtas, brand: null, attrs: { colour: "Mustard and gold" } });
+    await t.pool.query(`update product_variants set options = '{"size": "UK 7"}' where product_id = $1`, [id]);
+    expect(await ids("/products?q=bandhgala&size=uk%207")).toEqual(["Bandhgala sherwani"]);
+    expect(await ids("/products?q=bandhgala&size=M,UK%207")).toEqual(["Bandhgala sherwani"]);
+    expect(await ids("/products?q=bandhgala&size=M")).toEqual([]);
+    expect(await ids("/products?q=bandhgala&colour=gold")).toEqual(["Bandhgala sherwani"]);
+    expect(await ids("/products?q=bandhgala&colour=Blue,Mustard")).toEqual(["Bandhgala sherwani"]);
+    expect(await ids("/products?q=bandhgala&colour=blue")).toEqual([]);
+    expect((await get("/products?colour=%25")).statusCode).toBe(400);
+    expect((await get(`/products?size=${"x".repeat(21)}`)).statusCode).toBe(400);
+  });
+});

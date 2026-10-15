@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+# Signed-in and personal screens have nothing to index.
+Disallow: /api/
+# …except product photos, so they can appear in image search and link previews.
+Allow: /api/v1/catalogue/media/
+Disallow: /cart
+Disallow: /profile
+Disallow: /inbox
+Disallow: /sell
+Disallow: /home/
+
+Sitemap: https://reloved-pwa.vercel.app/sitemap.xml

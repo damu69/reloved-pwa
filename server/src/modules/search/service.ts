@@ -11,6 +11,8 @@ export interface SearchParams {
   brands?: string[] | undefined;     // brand slugs
   sellerId?: string | undefined;
   conditions?: string[] | undefined;
+  sizes?: string[] | undefined;      // variant size option, case-insensitive exact match
+  colours?: string[] | undefined;    // words looked for inside the product's colour attribute
   minPricePaise?: number | undefined;
   maxPricePaise?: number | undefined;
   includeOutOfStock?: boolean | undefined;   // default: sold-out products are hidden
@@ -82,6 +84,15 @@ export class PostgresSearch implements SearchService {
     if (p.brands?.length) where.push(`ps.brand_slug = any(${arg(p.brands)})`);
     if (p.sellerId) where.push(`ps.seller_id = ${arg(p.sellerId)}`);
     if (p.conditions?.length) where.push(`ps.condition = any(${arg(p.conditions)})`);
+    if (p.sizes?.length) {
+      where.push(`exists (select 1 from product_variants v where v.product_id = ps.product_id and v.is_active and v.deleted_at is null
+        and lower(v.options ->> 'size') = any(${arg(p.sizes.map((s) => s.toLowerCase()))}))`);
+    }
+    if (p.colours?.length) {
+      // Colour is free text ("Red and white"), so look for each chosen word in it. Words are letters only (validated), so no LIKE wildcards.
+      where.push(`exists (select 1 from products pr where pr.id = ps.product_id
+        and pr.attributes ->> 'colour' ilike any(${arg(p.colours.map((c) => "%" + c + "%"))}))`);
+    }
     if (p.minPricePaise !== undefined) where.push(`ps.min_price_paise >= ${arg(p.minPricePaise)}`);
     if (!p.includeOutOfStock) where.push("ps.in_stock");
     if (p.maxPricePaise !== undefined) where.push(`ps.min_price_paise <= ${arg(p.maxPricePaise)}`);

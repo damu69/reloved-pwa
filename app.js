@@ -349,7 +349,7 @@ function crumbsHTML(path, current) {
     var segs = path.split("/"), acc = "";
     segs.forEach(function (s, n) {
       acc += (n ? "/" : "") + s; var c = catByPath(acc), nm = c ? c.name : s;
-      out.push(current && n === segs.length - 1 ? '<span aria-current="page">' + esc(nm) + "</span>" : '<a href="' + esc(catUrl(acc)) + '" data-a="browse" data-i="' + esc(acc) + '">' + esc(nm) + "</a>");
+      out.push(current && n === segs.length - 1 ? '<span aria-current="page">' + esc(nm) + "</span>" : '<a href="' + esc(catUrl(acc)) + '" data-a="browse" data-i="' + esc(acc) + '" data-j="reset">' + esc(nm) + "</a>");
     });
   }
   return '<nav class="crumbs" aria-label="Breadcrumb">' + out.join('<i aria-hidden="true">/</i>') + "</nav>";
@@ -651,7 +651,7 @@ function renderNav() {
   var brandAndSearch = '<a class="navbrand" href="/" data-a="browse" data-i="" data-j="reset">Re<em>loved</em></a>' +
     '<form class="navsearch" id="nf" role="search"><span class="muted" aria-hidden="true">&#9906;</span><input id="nq" type="search" placeholder="Search for items" aria-label="Search for items" value="' + esc(UI.q) + '"></form>';
   var catRow = '<div class="navcats" role="navigation" aria-label="Categories"><a href="/" data-a="browse" data-i="" data-j="reset" class="' + (onHome && !UI.cat && !UI.q.trim() ? "on" : "") + '">Just listed</a>' +
-    topCats().map(function (c) { return '<a href="' + esc(catUrl(c.path)) + '" data-a="browse" data-i="' + esc(c.path) + '" class="' + (onHome && topc === c.path ? "on" : "") + '">' + esc(c.name) + "</a>"; }).join("") + "</div>";
+    topCats().map(function (c) { return '<a href="' + esc(catUrl(c.path)) + '" data-a="browse" data-i="' + esc(c.path) + '" data-j="reset" class="' + (onHome && topc === c.path ? "on" : "") + '">' + esc(c.name) + "</a>"; }).join("") + "</div>";
   nav.innerHTML = brandAndSearch + tabs.map(function (t) {
     var on = (!stack.length && tab === t[0]) || (stack.length && t[0] === "inbox" && cur().v === "chat");
     // Cart is hidden from the phone tab bar by CSS (it sits in the home header there) and shown in the desktop top bar.

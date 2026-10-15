@@ -195,6 +195,7 @@ async function loadFeed(more) {
     (r.items || []).forEach(function (i) { PCAT[i.id] = i.categoryPath; PTITLE[i.id] = i.title; }); F.items = more ? F.items.concat(r.items) : r.items; F.next = r.nextCursor || null; F.loaded = true;
   } catch (e) { if (my !== feedSeq) return; F.error = errText(e); }
   F.loading = false; partialFeed();
+  if (restoreAfterFeed != null) { window.scrollTo(0, restoreAfterFeed); restoreAfterFeed = null; } // Back to a list that had to reload
 }
 function need(key, fn) {
   var c = C[key];
@@ -256,12 +257,19 @@ function syncUrl() {
   } catch (e) { }
   pushNext = false;
 }
-function navPush() { pushNext = true; }
+// Scroll position per address: remembered as you leave a screen, put back when Back/Forward returns to it.
+var scrollPos = {}, restoreAfterFeed = null;
+function here() { return location.pathname + location.search; }
+function navPush() { pushNext = true; restoreAfterFeed = null; scrollPos[here()] = window.pageYOffset; }
 window.addEventListener("popstate", function (e) {
   if (!S.ready) return;
-  var feedChanged = restore(e.state || parseUrl()), c = cur();
-  enter(c.v, c.p); if (feedChanged) loadFeed(false); render();
+  var feedChanged = restore(e.state || parseUrl()), c = cur(), y = scrollPos[here()] || 0;
+  enter(c.v, c.p); if (feedChanged) { restoreAfterFeed = y; loadFeed(false); } render(); window.scrollTo(0, y);
 });
+// The tab bar's height (0 while it is hidden) drives where the toast, chat box and sticky photo sit; see styles.css.
+function setNavHeight() { var n = $("nav"); document.documentElement.style.setProperty("--navh", n && !n.hidden ? n.offsetHeight + "px" : "0px"); }
+window.addEventListener("resize", setNavHeight);
+try { history.scrollRestoration = "manual"; } catch (e) { }
 
 /* ============ scripts loaded on demand ============ */
 var scripts = {};
@@ -557,7 +565,7 @@ function render() {
   dirty = false;
   var main = $("main"), nav = $("nav");
   if (!S.ready) return;
-  var c = cur(), v = c.v, keep = main.scrollTop, same = main.dataset.v === v + ":" + (c.p || ""), mod = MOD_OF[v];
+  var c = cur(), v = c.v, keep = window.pageYOffset, same = main.dataset.v === v + ":" + (c.p || ""), mod = MOD_OF[v];
   if (mod && modState[mod] !== "ok") {
     loadMod(mod);
     main.innerHTML = head("", stack.length > 0) + (modState[mod] === "err" ? failBox("Check your connection and try again.", "modretry") : loadingBox()); main.dataset.v = "";
@@ -569,7 +577,8 @@ function render() {
   main.innerHTML = (V[v] || V.home)(c.p); main.dataset.v = v + ":" + (c.p || "");
   nav.hidden = v === "auth";
   renderNav(); syncUrl(); docHead();
-  if (same) main.scrollTop = keep;
+  setNavHeight();
+  if (same) window.scrollTo(0, keep);
   if (window.RL) RL.hooks.forEach(function (f) { try { f(); } catch (e) { } });
 }
 function renderNav() {
@@ -615,8 +624,10 @@ function enter(v, p) {
   if (v === "home" && !UI.feed.loaded) loadFeed(false);
   if (window.RL && RL.E && RL.E[v]) RL.E[v](p);
 }
-function go(v, p) { UI.confirm = null; navPush(); stack.push({ v: v, p: p }); enter(v, p); render(); $("main").scrollTop = 0; }
-function setTab(t) { stack = []; tab = t; UI.confirm = null; navPush(); enter(t); render(); $("main").scrollTop = 0; }
+// The page scrolls, so a new screen starts at the top and going back puts the old position back (see popstate).
+function toTop() { window.scrollTo(0, 0); }
+function go(v, p) { UI.confirm = null; navPush(); stack.push({ v: v, p: p }); enter(v, p); render(); toTop(); }
+function setTab(t) { stack = []; tab = t; UI.confirm = null; navPush(); enter(t); render(); toTop(); }
 // If this visit pushed the current entry, step back through the browser history so its Back button stays in step;
 // popstate then restores the previous screen. Otherwise (opened from a link) just drop the top screen.
 function back() {
@@ -624,7 +635,7 @@ function back() {
   if (depth > 0 && history.state && history.state.d === depth) { history.back(); return; }
   stack.pop(); render();
 }
-function replace(v, p) { UI.confirm = null; stack.pop(); stack.push({ v: v, p: p }); enter(v, p); render(); $("main").scrollTop = 0; }
+function replace(v, p) { UI.confirm = null; stack.pop(); stack.push({ v: v, p: p }); enter(v, p); render(); toTop(); }
 function afterAuth() { if (cur().v === "auth") stack.pop(); drop(""); S.ready = true; render(); if (tab === "home" || !UI.feed.loaded) loadFeed(false); }
 
 /* ============ actions ============ */

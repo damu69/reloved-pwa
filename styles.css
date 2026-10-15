@@ -11,13 +11,15 @@
 :root[data-theme="light"]{
   --bg:#f7f2ea; --surface:#fffdf9; --surface2:#efe8dc; --line:#ddd3c3; --fg:#26211b; --muted:#6f655a;
   --accent:#8f5a17; --accent-ink:#fffaf2; --warn:#8a5a00; --warn-bg:#fbefd6; --bad:#b4372b; --ok:#2f7a46; color-scheme:light}
-html,body{height:100%}
-body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.4}
+/* The page itself scrolls (not an inner box), so phone browsers can hide their address bar, pull-to-refresh and the
+   browser's own scroll handling work, and a wide first screen is not boxed in. --navh is the tab bar's height, set by app.js. */
+html{--navh:0px}
+body{margin:0;min-height:100vh;min-height:100dvh;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.4}
 *{box-sizing:border-box} button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:0;padding:0}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-#app{max-width:460px;height:100%;margin:0 auto;display:flex;flex-direction:column;background:var(--bg);position:relative;border-inline:1px solid var(--line)}
-#main{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 16px 24px}
+#app{max-width:460px;min-height:100vh;min-height:100dvh;margin:0 auto;display:flex;flex-direction:column;background:var(--bg);position:relative;border-inline:1px solid var(--line)}
+#main{flex:1;min-width:0;overflow-x:clip;padding:16px 16px 24px}
 h1,h2,h3{font-family:var(--f-display);font-weight:400;margin:0;text-wrap:balance;letter-spacing:.005em}
 h1{font-size:1.9rem;line-height:1.1} h2{font-size:1.45rem;line-height:1.15} h3{font-size:1.15rem}
 .muted{color:var(--muted)} .small{font-size:.8rem} .ok{color:var(--ok)} .bad{color:var(--bad)}
@@ -66,7 +68,7 @@ a.card,a.chip{color:inherit;text-decoration:none} a.chip{color:var(--muted)} a.c
 .toggle::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--muted);transition:.15s}
 .toggle[aria-checked=true]{background:var(--accent);border-color:var(--accent)}
 .toggle[aria-checked=true]::after{left:21px;background:var(--accent-ink)}
-.nav{display:flex;border-top:1px solid var(--line);background:var(--bg);padding:4px 2px calc(4px + env(safe-area-inset-bottom,0px))}
+.nav{display:flex;position:sticky;bottom:0;z-index:10;border-top:1px solid var(--line);background:var(--bg);padding:4px 2px calc(4px + env(safe-area-inset-bottom,0px))}
 .nav button{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 0 5px;color:var(--muted);font-size:.74rem;font-weight:500;letter-spacing:.02em}
 .nav .t-cart{display:none} /* phones and tablets: cart lives in the home header (.hdr-cart); the desktop top bar shows it again */
 .nav button.on{color:var(--fg)}
@@ -96,13 +98,13 @@ textarea.inp{min-height:90px;resize:vertical}
 .itemcard{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%;text-align:left}
 .itemcard .ph{width:56px;aspect-ratio:1;flex:none;border-radius:6px}
 .itemcard .ph .phi{width:60%}
-.composer{display:flex;gap:8px;position:sticky;bottom:-24px;background:var(--bg);padding:8px 0 24px}
+.composer{display:flex;gap:8px;position:sticky;bottom:var(--navh);z-index:5;background:var(--bg);padding:8px 0}
 .empty{text-align:center;padding:40px 16px;color:var(--muted)}
 .empty h2{color:var(--fg);margin-bottom:6px}
 .pill{font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:5px;background:var(--surface2);white-space:nowrap}
 .pill.ok{color:var(--ok)} .pill.bad{color:var(--bad)} .pill.prog{color:var(--warn)}
 .doc h3{margin:16px 0 4px} .doc p{margin:0 0 8px;color:var(--muted)}
-.toast{pointer-events:none;position:absolute;left:16px;right:16px;bottom:78px;background:var(--fg);color:var(--bg);padding:11px 14px;border-radius:8px;font-weight:600;text-align:center;z-index:5}
+.toast{pointer-events:none;position:fixed;left:50%;transform:translateX(-50%);width:min(calc(100% - 32px),428px);bottom:calc(var(--navh) + 14px);background:var(--fg);color:var(--bg);padding:11px 14px;border-radius:8px;font-weight:600;text-align:center;z-index:5}
 .dot{background:var(--accent);color:var(--accent-ink);border-radius:99px;font-size:.66rem;font-style:normal;font-weight:700;padding:1px 6px;line-height:1.35}
 .gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:8px;margin-bottom:12px;scrollbar-width:none}
 .gallery .ph{flex:none;width:100%;scroll-snap-align:center;aspect-ratio:1}
@@ -112,7 +114,7 @@ textarea.inp{min-height:90px;resize:vertical}
 .stars button{font-size:1.6rem;color:var(--line)} .stars button.on{color:var(--warn)}
 .steps{display:flex;gap:6px;margin:10px 0 14px}.steps i{flex:1;height:5px;border-radius:9px;background:var(--line)}.steps i.on{background:var(--accent)}
 .sum{display:flex;justify-content:space-between;padding:4px 0}.sum.total{border-top:1px solid var(--line);margin-top:6px;padding-top:10px;font-weight:700}
-.loading{display:grid;place-items:center;height:100%;color:var(--muted)}
+.loading{display:grid;place-items:center;min-height:70vh;min-height:70dvh;color:var(--muted)}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .auth{padding-top:8vh}.auth .two{margin-top:8px}.install{margin-top:8px}
 /* Phase A (new backend) additions */
@@ -130,7 +132,7 @@ select.inp{appearance:auto}
 .clip{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* Discover: swipe cards */
-.dk{display:flex;flex-direction:column;min-height:100%}
+.dk{display:flex;flex-direction:column;min-height:calc(100vh - var(--navh) - 40px);min-height:calc(100dvh - var(--navh) - 40px)}
 .dk-head{margin-bottom:8px}
 .dk-stage{position:relative;flex:1;min-height:340px;max-height:620px;margin:2px 0 14px;touch-action:none;user-select:none;-webkit-user-select:none}
 .sw-card{position:absolute;inset:0;border-radius:12px;overflow:hidden;background:var(--surface);border:1px solid var(--line);box-shadow:0 14px 34px rgba(0,0,0,.35);touch-action:none;cursor:grab;will-change:transform}
@@ -158,8 +160,8 @@ select.inp{appearance:auto}
 .rb:disabled{opacity:.35;cursor:not-allowed}
 .rb:not(:disabled):active{transform:scale(.94)}
 .dk-hint{text-align:center;color:var(--muted);font-size:.78rem;margin:12px 0 0}
-.scrim{position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:20}
-.sheet{position:absolute;left:0;right:0;bottom:0;z-index:21;background:var(--surface);border-top:1px solid var(--line);border-radius:14px 14px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 -12px 40px rgba(0,0,0,.4)}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20}
+.sheet{position:fixed;left:50%;transform:translateX(-50%);width:min(100%,460px);bottom:0;z-index:21;background:var(--surface);border-top:1px solid var(--line);border-radius:14px 14px 0 0;padding:18px 16px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 -12px 40px rgba(0,0,0,.4)}
 
 /* Inbox and chat */
 .chatrow{align-items:flex-start}
@@ -198,8 +200,8 @@ select.inp{appearance:auto}
 @media (min-width:768px) and (max-width:899px){
   .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
   /* item page: photo and details side by side, as on desktop */
-  .itemgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
-  .itemgrid .gallery{position:sticky;top:0;margin-bottom:0}
+  #main .itemgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
+  .itemgrid .gallery{position:sticky;top:16px;margin-bottom:0}
   .dk{max-width:460px;margin:0 auto}
 }
 
@@ -209,7 +211,7 @@ select.inp{appearance:auto}
   body{font-size:16px}
   #app{max-width:none;border-inline:0;flex-direction:column-reverse}
   /* navigation becomes a top bar */
-  .nav{position:relative;border-top:0;border-bottom:1px solid var(--line);padding:0 max(24px,calc((100% - 1180px)/2));gap:4px;justify-content:flex-end;flex:none}
+  .nav{position:sticky;top:0;bottom:auto;border-top:0;border-bottom:1px solid var(--line);padding:0 max(24px,calc((100% - 1180px)/2));gap:4px;justify-content:flex-end;flex:none}
   .nav::before{content:"Reloved";font-family:var(--f-display);font-size:1.7rem;margin-right:auto;align-self:center;letter-spacing:.01em}
   .nav button{flex:none;flex-direction:row;gap:8px;padding:16px 14px;font-size:.92rem}
   .nav button.on::before{top:auto;bottom:-1px;left:10px;right:10px}
@@ -227,7 +229,7 @@ select.inp{appearance:auto}
   .card:hover .ph{filter:brightness(1.08)}
   /* item page: gallery left, details right */
   .itemgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:36px;align-items:start}
-  .itemgrid .gallery{position:sticky;top:0;margin-bottom:0}
+  .itemgrid .gallery{position:sticky;top:calc(var(--navh) + 16px);margin-bottom:0}
   /* Discover: one centred card with the buttons below it */
   .dk{max-width:430px;margin:0 auto}
   .dk-stage{flex:none;height:clamp(360px,calc(100dvh - 400px),600px);min-height:0;max-height:none}
@@ -241,7 +243,9 @@ select.inp{appearance:auto}
   /* dialogs sit in the middle instead of sliding from the bottom */
   .scrim{position:fixed}
   .sheet{position:fixed;left:50%;right:auto;bottom:auto;top:50%;transform:translate(-50%,-50%);width:min(460px,92vw);border:1px solid var(--line);border-radius:14px}
-  .toast{position:fixed;left:50%;right:auto;bottom:28px;transform:translateX(-50%);min-width:240px}
+  .toast{bottom:28px;width:auto;max-width:min(90vw,520px);min-width:240px}
+  .composer{bottom:0}
+  html{scroll-padding-top:calc(var(--navh) + 12px)}
 }
 
 /* chat safety links and legal footer */

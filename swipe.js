@@ -244,9 +244,9 @@ function bubbles() {
 }
 function paintMsgs(stick) {
   var box = $("msgs"); if (!box) return;
-  var main = $("main"), near = main.scrollHeight - main.scrollTop - main.clientHeight < 140;
+  var doc = document.documentElement, near = doc.scrollHeight - window.pageYOffset - window.innerHeight < 140;
   box.innerHTML = bubbles();
-  if (stick || near) main.scrollTop = main.scrollHeight;
+  if (stick || near) window.scrollTo(0, doc.scrollHeight);
 }
 async function loadChat(id) {
   try {
@@ -281,7 +281,7 @@ V.chat = function (id) {
 A.chatblock = async function () { if (!CH.conv || !CH.conv.otherUserId) return; await A.blockuser(CH.conv.otherUserId); };
 A.chatretry = function () { var id = CH.id; CH = { id: null }; R.replace("chat", id); };
 R.hooks.push(function () {
-  if (R.current().v === "chat" && CH.loaded) { var m = $("main"); if (m && !CH.shown) { m.scrollTop = m.scrollHeight; } CH.shown = true; }
+  if (R.current().v === "chat" && CH.loaded) { if (!CH.shown) window.scrollTo(0, document.documentElement.scrollHeight); CH.shown = true; }
   else CH.shown = false;
 });
 document.addEventListener("input", function (e) { if (e.target.id === "chat_in") { CH.draft = e.target.value; e.target.style.height = "auto"; e.target.style.height = Math.min(120, e.target.scrollHeight) + "px"; } });

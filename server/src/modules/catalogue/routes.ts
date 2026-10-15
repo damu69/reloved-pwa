@@ -352,6 +352,9 @@ export async function publicCatalogueRoutes(app: FastifyInstance): Promise<void>
       brand: list(10).refine((v) => !v || v.every((b) => /^[a-z0-9-]{1,60}$/.test(b)), "Invalid brand"),
       sellerId: uuid().optional(),
       condition: list(5).refine((v) => !v || v.every((c) => ["new_with_tags", "new", "very_good", "good", "satisfactory"].includes(c)), "Invalid condition"),
+      // Variant size option, e.g. "M" or "UK 7" (case-insensitive exact match), and colour words matched inside the colour attribute.
+      size: list(10).refine((v) => !v || v.every((s) => /^[A-Za-z0-9 ./-]{1,20}$/.test(s)), "Invalid size"),
+      colour: list(5).refine((v) => !v || v.every((c) => /^[A-Za-z]{2,20}$/.test(c)), "Invalid colour"),
       // Price filters are in rupees for convenience; results carry prices in paise.
       minPrice: rupees,
       maxPrice: rupees,
@@ -361,7 +364,7 @@ export async function publicCatalogueRoutes(app: FastifyInstance): Promise<void>
       cursor: z.string().max(300).optional(),
     }), req.query);
     return app.searchService.search({
-      q: q.q, category: q.category, brands: q.brand, sellerId: q.sellerId, conditions: q.condition,
+      q: q.q, category: q.category, brands: q.brand, sellerId: q.sellerId, conditions: q.condition, sizes: q.size, colours: q.colour,
       minPricePaise: q.minPrice === undefined ? undefined : Math.round(q.minPrice * 100),
       maxPricePaise: q.maxPrice === undefined ? undefined : Math.round(q.maxPrice * 100),
       sort: q.sort, limit: q.limit, cursor: q.cursor, includeOutOfStock: q.includeOutOfStock === "true",

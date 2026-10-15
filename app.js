@@ -151,6 +151,8 @@ function catByPath(p) { for (var i = 0; i < S.cats.length; i++) if (S.cats[i].pa
 async function loadCats() { try { S.cats = (await api.get("/catalogue/categories", { anon: true })).items || []; } catch (e) { S.cats = S.cats || []; } }
 async function loadMe() {
   var r = await api.get("/me"); S.user = r.user; S.perms = r.permissions || [];
+  // Sellers and admins will want their screens soon, so fetch them now in the background.
+  if (S.perms.length) loadMod("admin"); else if ((S.user.roles || []).indexOf("seller") > -1) loadMod("seller");
   await Promise.all([loadCart(), loadWish()]);
 }
 async function loadCart() { try { S.cart = await api.get("/cart"); } catch (e) { if (e.status === 401) S.cart = null; } }
@@ -192,6 +194,49 @@ function need(key, fn) {
   return c;
 }
 function drop(prefix) { Object.keys(C).forEach(function (k) { if (k.indexOf(prefix) === 0) delete C[k]; }); }
+
+/* ============ scripts loaded on demand ============ */
+var scripts = {};
+function loadScript(src, attrs) {
+  if (!scripts[src]) scripts[src] = new Promise(function (ok, fail) {
+    var s = document.createElement("script"); s.src = src;
+    Object.keys(attrs || {}).forEach(function (k) { s.setAttribute(k, attrs[k]); });
+    s.onload = ok; s.onerror = function () { delete scripts[src]; s.remove(); fail(new Error("Could not load " + src)); };
+    document.body.appendChild(s);
+  });
+  return scripts[src];
+}
+// Seller and admin screens are fetched only when someone opens one, so shoppers never download them.
+// admin.js uses helpers from seller.js (RL.H), so seller.js always runs first.
+var MODS = { seller: ["seller.js"], admin: ["seller.js", "admin.js"] }, MOD_OF = {}, modState = {}; // modState: name -> "loading" | "ok" | "err"
+"sell slbank slearn slform slorder slorders slprod slprods".split(" ").forEach(function (v) { MOD_OF[v] = "seller"; });
+"admin adcat adcomm adcoupons adfees adorder adorders adprod adprods adrules adseller adsellers adusers".split(" ").forEach(function (v) { MOD_OF[v] = "admin"; });
+function loadMod(name) {
+  if (modState[name]) return; // already loaded, loading, or failed (the "Try again" button clears a failure)
+  modState[name] = "loading";
+  MODS[name].reduce(function (p, src) { return p.then(function () { return loadScript(src); }); }, Promise.resolve())
+    .then(function () { modState[name] = "ok"; refresh(); }, function () { modState[name] = "err"; refresh(); });
+}
+// Nova help chat. Its closed launcher is a fixed 320x96 frame in the bottom-right corner, which on a phone sits over the
+// Cart and Profile tabs, so it is loaded only when asked for and lifted above the bottom tab bar while closed.
+function openHelpChat() {
+  var cfg = window.APP_CONFIG || {};
+  if (window.__novaWidgetLoaded) { toast("The chat button is in the bottom corner."); return; }
+  toast("Opening chat…");
+  watchNova(new URL(cfg.NOVA_SRC).origin);
+  loadScript(cfg.NOVA_SRC, { "data-client-id": cfg.NOVA_CLIENT }).catch(function () { toast("Chat is not available right now. Please try again later."); });
+}
+function watchNova(origin) {
+  function place(f, open) { var nav = $("nav"), atBottom = nav && !nav.hidden && nav.getBoundingClientRect().top > innerHeight / 2; f.style.bottom = !open && atBottom ? nav.offsetHeight + "px" : "0"; }
+  function found() {
+    var f = document.querySelector('iframe[title="Nova AI chat"]'); if (!f) return false;
+    place(f, false);
+    window.addEventListener("message", function (e) { if (e.origin === origin && e.source === f.contentWindow && e.data && e.data.type === "nova:open") place(f, e.data.open === true); });
+    return true;
+  }
+  var mo = new MutationObserver(function () { if (found()) mo.disconnect(); });
+  mo.observe(document.body, { childList: true });
+}
 
 /* ============ views ============ */
 var V = {};
@@ -366,10 +411,6 @@ V.wish = function () {
   var v = Object.keys(S.wish).map(function (k) { var w = S.wish[k]; return { id: w.productId, title: w.title, minPricePaise: w.minPricePaise, coverImageId: w.coverImageId, inStock: w.inStock, condition: "", brandName: "" }; });
   return head("Favourite items", true) + (v.length ? '<div class="grid">' + v.map(function (i) { var f = card(i); return f.replace(/<div class="m">.*?<\/div>/, ""); }).join("") + "</div>" : '<div class="empty"><h2>No favourites yet</h2>Tap the heart on an item to save it.</div>');
 };
-V.sell = function () {
-  return head("Sell") + '<div class="banner"><b>Selling on Reloved</b><span class="small muted">Seller sign-up with identity and bank verification, product listing and order handling are being moved to the new system. They will be available in the next update.</span></div>' +
-    '<div class="list">' + row("1", "Apply as a seller", "Coming soon", "", "<span></span>") + row("2", "List products with photos and sizes", "Coming soon", "", "<span></span>") + row("3", "Manage stock and orders", "Coming soon", "", "<span></span>") + row("4", "See your earnings", "Coming soon", "", "<span></span>") + "</div>";
-};
 V.profile = function () {
   if (!signedIn()) return head("Profile") + '<div class="empty"><h2>Welcome to Reloved</h2>Sign in to see your orders, favourites and addresses.<div style="margin-top:12px"><button class="btn" data-a="go" data-i="auth">Sign in or create account</button></div></div>' + docRows();
   var u = S.user, roles = (u.roles || []).filter(function (r) { return r !== "customer"; });
@@ -396,7 +437,8 @@ var DOCS = {
 V.doc = function (k) { var d = DOCS[k] || ["Information", "No content."]; return head(esc(d[0]), true) + "<p>" + esc(d[1]) + "</p>"; };
 V.help = function () {
   var q = [["How do I pay?", "Online payment is not switched on yet in this trial. You can place an order, but it cannot be paid for now, and unpaid orders are released after 15 minutes."], ["What does delivery cost?", "Each seller's package has its own delivery fee: home delivery, pickup point or meet and collect. You choose in the cart and see the total before you order."], ["Can I cancel an order?", "Yes. Unpaid orders can be cancelled any time. A paid package can be cancelled until the seller ships it, and you get your money back."], ["Can I return an item?", "Within 7 days of delivery if it arrived damaged or is fake. Add photos to your request. Size returns are not accepted because items are pre-owned."], ["I forgot my password", "Password reset by email is not available yet."]];
-  return head("Help Centre", true) + '<div class="list">' + q.map(function (x) { return '<div class="row" style="display:block"><b>' + x[0] + '</b><br><span class="muted">' + x[1] + "</span></div>"; }).join("") + "</div>";
+  // The chat checks the page's domain, so it is offered on the website only, not inside the Android app.
+  return head("Help Centre", true) + (api.isApp ? "" : '<button class="btn block" data-a="nova" style="margin-bottom:12px">Chat with us</button>') + '<div class="list">' + q.map(function (x) { return '<div class="row" style="display:block"><b>' + x[0] + '</b><br><span class="muted">' + x[1] + "</span></div>"; }).join("") + "</div>";
 };
 V.about = function () { return head("About", true) + '<div class="list">' + [["Our platform", "platform"], ["How it works", "how"], ["Trust and Safety", "trust"]].map(function (t) { return row("i", t[0], "", 'data-a="go" data-i="doc" data-j="' + t[1] + '"'); }).join("") + "</div>"; };
 V.legal = function () { return head("Terms &amp; legal", true) + '<div class="list">' + row("§", "User Terms and Conditions", "", 'data-a="go" data-i="tc"') + row("§", "Privacy Centre", "", 'data-a="go" data-i="doc" data-j="privacy"') + '<a class="row" href="'+(window.APP_CONFIG.SITE||"")+'/privacy.html" target="_blank" rel="noopener"><span class="ic">§</span><span class="l">Full Privacy Policy</span><span class="chev"></span></a><a class="row" href="'+(window.APP_CONFIG.SITE||"")+'/terms.html" target="_blank" rel="noopener"><span class="ic">§</span><span class="l">Terms of Use</span><span class="chev"></span></a>' + "</div>"; };
@@ -413,7 +455,12 @@ function render() {
   dirty = false;
   var main = $("main"), nav = $("nav");
   if (!S.ready) return;
-  var c = cur(), v = c.v, keep = main.scrollTop, same = main.dataset.v === v + ":" + (c.p || "");
+  var c = cur(), v = c.v, keep = main.scrollTop, same = main.dataset.v === v + ":" + (c.p || ""), mod = MOD_OF[v];
+  if (mod && modState[mod] !== "ok") {
+    loadMod(mod);
+    main.innerHTML = head("", stack.length > 0) + (modState[mod] === "err" ? failBox("Check your connection and try again.", "modretry") : loadingBox()); main.dataset.v = "";
+    nav.hidden = false; renderNav(); return;
+  }
   main.innerHTML = (V[v] || V.home)(c.p); main.dataset.v = v + ":" + (c.p || "");
   nav.hidden = v === "auth";
   renderNav();
@@ -462,6 +509,8 @@ async function act(a, i, j, el) {
     case "back": back(); return;
     case "go": go(i, j || undefined); return;
     case "reload": location.reload(); return;
+    case "modretry": Object.keys(modState).forEach(function (k) { if (modState[k] === "err") delete modState[k]; }); render(); return;
+    case "nova": openHelpChat(); return;
     case "item": go("item", i); return;
     case "cat": UI.cat = i; loadFeed(false); render(); return;
     case "browse": UI.cat = i; stack = []; tab = "home"; loadFeed(false); render(); return;
@@ -606,9 +655,12 @@ api.onLogout(function () { clearSession(); toast("Please sign in again"); stack 
 async function boot() {
   $("main").innerHTML = '<div class="loading">Loading marketplace…</div>';
   if ("serviceWorker" in navigator && !(window.api && window.api.isApp)) navigator.serviceWorker.register("sw.js").catch(function () {});
-  await loadCats();
+  var cats = loadCats();
+  // No session to restore: fetch the products right away, next to the categories, instead of after a refresh that would fail.
+  if (!api.mayHaveSession()) { loadFeed(false); await cats; S.ready = true; render(); return; }
   var ok = await api.restore();
   if (ok) { try { await loadMe(); } catch (e) { clearSession(); } }
+  await cats;
   S.ready = true; render(); loadFeed(false);
 }
 window.RL = { V: V, A: {}, E: {}, PCAT: PCAT, paintNav: renderNav, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,

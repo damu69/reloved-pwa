@@ -11,6 +11,12 @@
   var appHeaders = IS_APP ? { "X-Client": "app" } : {};
   var cred = IS_APP ? "omit" : "include";
   var token = null, expiresAt = 0, refreshing = null, onLogout = function () {};
+  // The website's refresh cookie is httpOnly, so the page cannot see whether one exists. This flag remembers whether the
+  // last session check found one: "1" yes, "0" no, missing = never checked. Logged-out visitors then skip the refresh
+  // call (it can only answer 401) instead of making the catalogue wait for it.
+  var HINT_KEY = "rl_session";
+  function hint(v) { if (IS_APP) return; try { localStorage.setItem(HINT_KEY, v); } catch (e) { } }
+  function mayHaveSession() { if (IS_APP) return true; try { return localStorage.getItem(HINT_KEY) !== "0"; } catch (e) { return true; } }
 
   function ApiError(status, body) {
     var e = (body && body.error) || {};
@@ -19,7 +25,7 @@
     return x;
   }
   function setSession(r) {
-    token = r.accessToken; expiresAt = Date.now() + (r.expiresIn || 900) * 1000;
+    token = r.accessToken; expiresAt = Date.now() + (r.expiresIn || 900) * 1000; hint("1");
     if (IS_APP && r.refreshToken) return setRt(r.refreshToken).then(function () { return r; });
     return r;
   }
@@ -31,7 +37,7 @@
         if (IS_APP) h["Content-Type"] = "application/json";
         return fetch(BASE + "/auth/refresh", { method: "POST", credentials: cred, headers: h, body: IS_APP ? JSON.stringify({ refreshToken: rt }) : undefined })
           .catch(function () { throw ApiError(0, null); });
-      }).then(function (r) { return r.json().catch(function () { return null; }).then(function (b) { if (!r.ok) { if (IS_APP && r.status === 401) setRt(null); throw ApiError(r.status, b); } return setSession(b); }); })
+      }).then(function (r) { return r.json().catch(function () { return null; }).then(function (b) { if (!r.ok) { if (r.status === 401) { hint("0"); if (IS_APP) setRt(null); } throw ApiError(r.status, b); } return setSession(b); }); })
         .finally(function () { refreshing = null; });
     }
     return refreshing;
@@ -72,8 +78,9 @@
     upload: function (p, form) { return call("POST", p, form); },
     login: function (email, password) { return raw("POST", "/auth/login", { email: email, password: password }).then(setSession); },
     register: function (b) { return raw("POST", "/auth/register", b).then(setSession); },
-    logout: function () { return (IS_APP ? getRt() : Promise.resolve(null)).then(function (rt) { return raw("POST", "/auth/logout", IS_APP ? { refreshToken: rt || undefined } : {}, { headers: { "X-Requested-With": "reloved" } }); }).catch(function () {}).then(function () { token = null; return setRt(null); }); },
+    logout: function () { return (IS_APP ? getRt() : Promise.resolve(null)).then(function (rt) { return raw("POST", "/auth/logout", IS_APP ? { refreshToken: rt || undefined } : {}, { headers: { "X-Requested-With": "reloved" } }); }).catch(function () {}).then(function () { token = null; hint("0"); return setRt(null); }); },
     restore: function () { return refresh().then(function () { return true; }, function () { return false; }); },
+    mayHaveSession: mayHaveSession,
     hasToken: function () { return !!token; },
     onLogout: function (f) { onLogout = f; },
     blob: async function (path) {

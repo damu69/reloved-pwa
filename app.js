@@ -234,7 +234,7 @@ function parseUrl() {
   var qs = new URLSearchParams(location.search), st = { tab: "home", stack: [], q: "", cat: "", sellerId: "", sellerName: "" };
   if (parts[0] === "item" && UUID_RE.test(parts[1] || "")) st.stack = [{ v: "item", p: parts[1] }];
   else if (parts[0] === "c") st.cat = parts.slice(1).filter(function (x) { return /^[a-z0-9-]+$/.test(x); }).join("/");
-  else if (parts[0] === "search") { st.q = (qs.get("q") || "").slice(0, 200); st.cat = qs.get("c") || ""; }
+  else if (parts[0] === "search") { st.q = (qs.get("q") || "").slice(0, 200); st.cat = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/.test(qs.get("c") || "") ? qs.get("c") : ""; }
   else if (parts[0] === "seller" && UUID_RE.test(parts[1] || "")) st.sellerId = parts[1];
   else if (TAB_NAMES.indexOf(parts[0]) > -1) { st.tab = parts[0]; if (/^[a-z]+$/.test(parts[1] || "") && !NO_URL[parts[1]]) st.stack = [{ v: parts[1], p: parts[2] }]; }
   return st;

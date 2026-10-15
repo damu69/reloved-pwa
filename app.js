@@ -45,12 +45,19 @@ function iconFor(cat) {
   return "hanger";
 }
 var PCAT = {}; // product id -> category path, learned from the feed and item pages, so tiles without a photo can show a fitting drawing
-function ph(title, pid, imgId, size, extra, cat) {
+// The server keeps every photo at 200, 600 and 1200px (WebP). srcset lets a phone grid take the 200 or 600 file and only
+// a large or sharp screen fetch 1200. `sizes` says how wide each kind of slot is drawn.
+var IMG_SIZES = { 600: "(min-width:900px) 230px, (min-width:768px) 25vw, (min-width:600px) 33vw, 50vw", 1200: "(min-width:768px) 55vw, 100vw" };
+function ph(title, pid, imgId, size, extra, cat, alt) {
   var bg = "background:" + TONES[hueOf(title) % TONES.length];
   var art = '<svg class="phi" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + ICONS[iconFor(cat || PCAT[pid])] + '"/></svg>';
+  size = size || 600;
+  var srcset = IMG_SIZES[size] ? ' srcset="' + [200, 600, 1200].filter(function (s) { return s <= size; }).map(function (s) { return esc(api.media(pid, imgId, s)) + " " + s + "w"; }).join(", ") + '" sizes="' + IMG_SIZES[size] + '"' : "";
   return '<div class="ph" style="' + bg + '">' + art +
-    (imgId ? '<img loading="lazy" alt="" src="' + esc(api.media(pid, imgId, size || 600)) + '" onerror="this.remove()">' : "") + (extra || "") + "</div>";
+    (imgId ? '<img loading="lazy" decoding="async" alt="' + esc(alt || "") + '" src="' + esc(api.media(pid, imgId, size)) + '"' + srcset + ' onerror="this.remove()">' : "") + (extra || "") + "</div>";
 }
+// Alt text for a product photo: "Maroon silk saree, Biba, Good".
+function photoAlt(title, brand, cond) { return [title, brand, COND[cond] || cond].filter(Boolean).join(", "); }
 var HEART = '<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3 5 6.5 5c2 0 3.6 1.1 5.5 3 1.9-1.9 3.5-3 5.5-3C21 5 22.8 8.6 21.5 11.8 19.5 16.4 12 21 12 21z"/></svg>';
 var toastT;
 function toast(m) { Array.prototype.forEach.call(document.querySelectorAll(".toast"), function (x) { x.remove(); }); var d = document.createElement("div"); d.className = "toast"; d.textContent = m; $("app").appendChild(d); clearTimeout(toastT); toastT = setTimeout(function () { d.remove(); }, 3200); }
@@ -137,7 +144,7 @@ function failBox(msg, retry) { return '<div class="empty"><h2>Could not load</h2
 /* ============ state ============ */
 var S = { user: null, perms: [], cats: [], cart: null, wish: {}, ready: false };
 var stack = [], tab = "home";
-var UI = { q: "", cat: "", cond: "", sort: "", minp: "", maxp: "", sellerId: "", sellerName: "", fil: false, feed: { items: [], next: null, loading: false, error: null, key: "", loaded: false },
+var UI = { q: "", cat: "", cond: "", brand: "", size: "", colour: "", sort: "", minp: "", maxp: "", sellerId: "", sellerName: "", fil: false, feed: { items: [], next: null, loading: false, error: null, key: "", loaded: false },
   auth: { mode: "login", busy: false, err: "" }, ck: { addressId: "", idem: null, busy: false, adding: false, err: "" }, coupon: "", pdv: {}, confirm: null, busy: false };
 var C = {}; // per-view fetched data: key -> {st:"loading"|"ok"|"err", data, err}
 
@@ -159,12 +166,15 @@ async function loadCart() { try { S.cart = await api.get("/cart"); } catch (e) {
 async function loadWish() { try { var r = await api.get("/me/wishlist"); S.wish = {}; (r.items || []).forEach(function (i) { S.wish[i.productId] = i; }); } catch (e) { S.wish = {}; } }
 function clearSession() { S.user = null; S.perms = []; S.cart = null; S.wish = {}; C = {}; UI.ck = { addressId: "", idem: null, busy: false, adding: false, err: "" }; }
 
-function feedKey() { return [UI.q, UI.cat, UI.cond, UI.sort, UI.minp, UI.maxp, UI.sellerId].join("|"); }
+function feedKey() { return [UI.q, UI.cat, UI.cond, UI.brand, UI.size, UI.colour, UI.sort, UI.minp, UI.maxp, UI.sellerId].join("|"); }
 function feedUrl(cursor) {
   var p = ["limit=24"];
   if (UI.q.trim()) p.push("q=" + encodeURIComponent(UI.q.trim()));
   if (UI.cat) p.push("category=" + encodeURIComponent(UI.cat));
   if (UI.cond) p.push("condition=" + encodeURIComponent(UI.cond));
+  if (UI.brand) p.push("brand=" + encodeURIComponent(UI.brand));
+  if (UI.size.trim()) p.push("size=" + encodeURIComponent(UI.size.trim()));
+  if (UI.colour) p.push("colour=" + encodeURIComponent(UI.colour));
   if (UI.sort) p.push("sort=" + encodeURIComponent(UI.sort));
   if (UI.minp > 0) p.push("minPrice=" + encodeURIComponent(UI.minp));
   if (UI.maxp > 0) p.push("maxPrice=" + encodeURIComponent(UI.maxp));
@@ -302,8 +312,8 @@ function card(i) {
   var f = !!S.wish[i.id], tag = i.inStock === false ? '<span class="tag">Sold out</span>' : "";
   // A real link, so search engines and the site crawler can follow it and people can open it in a new tab.
   return '<div><a class="card" href="' + esc(itemUrl(i.id, i.title)) + '" data-a="item" data-i="' + esc(i.id) + '" aria-label="' + esc(i.title) + '">' +
-    ph(i.title, i.id, i.coverImageId, 600, tag + '<span class="heart' + (f ? " on" : "") + '" data-a="fav" data-i="' + esc(i.id) + '" role="button" aria-label="Favourite" aria-pressed="' + f + '">' + HEART + "</span>") +
-    '<div class="t">' + esc(i.title) + '</div><div class="m">' + esc(COND[i.condition] || i.condition || "") + " · " + esc(i.brandName || "No brand") + '</div><div class="price">' + inr(i.minPricePaise) + "</div></a></div>";
+    ph(i.title, i.id, i.coverImageId, 600, tag + '<span class="heart' + (f ? " on" : "") + '" data-a="fav" data-i="' + esc(i.id) + '" role="button" aria-label="Favourite" aria-pressed="' + f + '">' + HEART + "</span>", null, photoAlt(i.title, i.brandName, i.condition)) +
+    '<div class="t">' + esc(i.title) + '</div><div class="m">' + esc([COND[i.condition] || i.condition, i.brandName].filter(Boolean).join(" · ")) + '</div><div class="price">' + inr(i.minPricePaise) + "</div></a></div>";
 }
 function gridHTML() {
   var F = UI.feed;
@@ -315,17 +325,48 @@ function gridHTML() {
 function moreHTML() { var F = UI.feed; return F.next ? '<button class="btn ghost block" data-a="more" ' + (F.loading ? "disabled" : "") + ">" + (F.loading ? "Loading…" : "Load more") + "</button>" : ""; }
 function partialFeed() { var g = $("grid"), m = $("more"); if (g) g.innerHTML = gridHTML(); if (m) m.innerHTML = moreHTML(); }
 
+// Why buy here: one short block above the grid on the plain home screen (Vinted opens with a pitch, the big stores with a campaign).
+function introHTML() {
+  return '<section class="intro"><h2>Preloved, checked, protected.</h2><ul>' +
+    "<li><b>Verified sellers.</b> Every seller is checked before they can sell, and every listing is reviewed.</li>" +
+    "<li><b>Buyer Protection</b> on every order. Damaged or fake? Return it within 7 days.</li>" +
+    "<li><b>Indian closets.</b> Kurtas, sarees, sneakers and more, priced in rupees.</li></ul>" +
+    '<div class="intro-cta"><a class="btn ghost sm" href="/home/doc/how" data-a="go" data-i="doc" data-j="how">How it works</a><a class="btn sm" href="/sell" data-a="tab" data-i="sell">Sell your clothes</a></div></section>';
+}
+// Cart as a header icon on phones (the bottom bar has five tabs); on desktop it stays in the top bar.
+function cartLink() {
+  var n = cartCount();
+  return '<a class="hdr-cart" href="/cart" data-a="tab" data-i="cart" aria-label="Cart' + (n ? ", " + n + " items" : "") + '"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h10.2L20 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>' + (n ? '<i class="dot">' + (n > 9 ? "9+" : n) + "</i>" : "") + "</a>";
+}
+/* ---- filters: sort, brand, condition (several), size, colour, price ---- */
+var SIZES = ["XS", "S", "M", "L", "XL", "XXL", "Free size", "UK 5", "UK 6", "UK 7", "UK 8", "UK 9", "UK 10", "EU 36", "EU 37", "EU 38", "EU 39", "EU 40", "EU 41", "EU 42"];
+var COLOURS = ["Black", "White", "Grey", "Blue", "Navy", "Red", "Maroon", "Pink", "Green", "Yellow", "Mustard", "Orange", "Brown", "Beige", "Gold", "Silver"];
+function condSet() { return UI.cond ? UI.cond.split(",") : []; }
+function filterCount() { return [UI.brand, UI.cond, UI.size, UI.colour, UI.minp, UI.maxp].filter(Boolean).length; }
+function loadBrands() { if (S.brands) return; S.brands = []; api.get("/catalogue/brands", { anon: true }).then(function (r) { S.brands = r.items || []; refresh(); }, function () { S.brands = null; }); }
+function opt(v, label, cur) { return '<option value="' + esc(v) + '"' + (v === cur ? " selected" : "") + ">" + esc(label) + "</option>"; }
+function filtersHTML() {
+  var cs = condSet();
+  return '<div class="banner filters"><div class="two"><label class="field"><span>Sort</span><select class="inp" id="fs" data-f="1">' + opt("", UI.q.trim() ? "Best match" : "Newest", UI.sort) + opt("price_asc", "Price: low to high", UI.sort) + opt("price_desc", "Price: high to low", UI.sort) + "</select></label>" +
+    '<label class="field"><span>Brand</span><select class="inp" id="fb" data-f="1">' + opt("", "Any brand", UI.brand) + (S.brands || []).map(function (b) { return opt(b.slug, b.name, UI.brand); }).join("") + "</select></label></div>" +
+    '<div class="field"><span>Condition</span><div class="chips wrap">' + Object.keys(COND).map(function (k) { var on = cs.indexOf(k) > -1; return '<button class="chip' + (on ? " on" : "") + '" data-a="condtog" data-i="' + k + '" aria-pressed="' + on + '">' + COND[k] + "</button>"; }).join("") + "</div></div>" +
+    '<div class="two"><label class="field"><span>Size</span><input class="inp" id="fz" data-f="1" list="fzl" value="' + esc(UI.size) + '" placeholder="Any, e.g. M or UK 7" autocomplete="off"><datalist id="fzl">' + SIZES.map(function (s) { return '<option value="' + s + '">'; }).join("") + "</datalist></label>" +
+    '<label class="field"><span>Colour</span><select class="inp" id="fcl" data-f="1">' + opt("", "Any colour", UI.colour) + COLOURS.map(function (c) { return opt(c, c, UI.colour); }).join("") + "</select></label></div>" +
+    '<div class="two"><label class="field"><span>Min price (₹)</span><input class="inp" id="fmin" data-f="1" inputmode="numeric" value="' + esc(UI.minp) + '" placeholder="0"></label><label class="field"><span>Max price (₹)</span><input class="inp" id="fmax" data-f="1" inputmode="numeric" value="' + esc(UI.maxp) + '" placeholder="No limit"></label></div>' +
+    (filterCount() ? '<button class="btn ghost sm" data-a="filclear">Clear filters</button>' : "") + "</div>";
+}
 V.home = function () {
   var tops = topCats(), top = UI.cat ? UI.cat.split("/")[0] : "", subs = top ? childCats(top) : [];
   function chip(path, label, on) { return '<a class="chip' + (on ? " on" : "") + '" href="' + esc(catUrl(path)) + '" data-a="cat" data-i="' + esc(path) + '">' + esc(label) + "</a>"; }
   var chips = chip("", "All", !UI.cat) + tops.map(function (c) { return chip(c.path, c.name, top === c.path); }).join("");
   var subchips = subs.length ? '<div class="chips">' + chip(top, "All " + ((catByPath(top) || {}).name || ""), UI.cat === top) +
     subs.map(function (c) { return chip(c.path, c.name, UI.cat === c.path); }).join("") + "</div>" : "";
-  return '<div class="brand">Re<em>loved</em></div><div style="display:flex;gap:8px;margin-bottom:12px"><div class="search" style="flex:1"><span class="muted">&#9906;</span><input id="q" type="search" placeholder="Search for items" value="' + esc(UI.q) + '" aria-label="Search"></div><button class="chip' + (UI.fil ? " on" : "") + '" data-a="fil">Filters</button></div>' +
-    (UI.fil ? '<div class="banner"><div class="two"><label class="field"><span>Sort</span><select class="inp" id="fs" data-f="1"><option value="">' + (UI.q.trim() ? "Best match" : "Newest") + '</option><option value="price_asc"' + (UI.sort === "price_asc" ? " selected" : "") + '>Price: low to high</option><option value="price_desc"' + (UI.sort === "price_desc" ? " selected" : "") + '>Price: high to low</option></select></label>' +
-      '<label class="field"><span>Condition</span><select class="inp" id="fc" data-f="1"><option value="">Any</option>' + Object.keys(COND).map(function (k) { return '<option value="' + k + '"' + (UI.cond === k ? " selected" : "") + ">" + COND[k] + "</option>"; }).join("") + "</select></label></div>" +
-      '<div class="two"><label class="field"><span>Min price (₹)</span><input class="inp" id="fmin" data-f="1" inputmode="numeric" value="' + esc(UI.minp) + '" placeholder="0"></label><label class="field"><span>Max price (₹)</span><input class="inp" id="fmax" data-f="1" inputmode="numeric" value="' + esc(UI.maxp) + '" placeholder="No limit"></label></div></div>' : "") +
+  var nf = filterCount(), plain = !UI.q.trim() && !UI.cat && !UI.sellerId && !nf;
+  return '<div class="homehead"><h1 class="brand">Re<em>loved</em></h1>' + cartLink() + "</div>" +
+    '<div style="display:flex;gap:8px;margin-bottom:12px"><div class="search" style="flex:1"><span class="muted">&#9906;</span><input id="q" type="search" placeholder="Search for items" value="' + esc(UI.q) + '" aria-label="Search"></div><button class="chip' + (UI.fil || nf ? " on" : "") + '" data-a="fil" aria-expanded="' + UI.fil + '">Filters' + (nf ? " (" + nf + ")" : "") + "</button></div>" +
+    (UI.fil ? filtersHTML() : "") +
     '<div class="chips">' + chips + "</div>" + subchips +
+    (plain && !UI.fil ? introHTML() : "") +
     (UI.sellerId ? '<div class="banner" style="display:flex;gap:10px;align-items:center"><span class="small" style="flex:1">Items from <b>' + esc(UI.sellerName || "this seller") + '</b></span><button class="chip" data-a="clearseller">Show all</button></div>' : "") +
     '<div class="grid" id="grid">' + gridHTML() + '</div><div id="more" style="margin-top:14px">' + moreHTML() + "</div>";
 };
@@ -344,17 +385,19 @@ V.item = function (pid) {
   var f = !!S.wish[pid], imgs = p.images && p.images.length ? p.images : [null];
   var off = v && v.mrpPaise > v.pricePaise ? Math.round((1 - v.pricePaise / v.mrpPaise) * 100) : 0;
   return head("", true, '<button class="back" data-a="fav" data-i="' + esc(pid) + '" aria-label="Favourite" aria-pressed="' + f + '"><span class="heart' + (f ? " on" : "") + '" style="position:static;background:none">' + HEART + "</span></button>") +
-    '<div class="itemgrid"><div class="gallery">' + imgs.map(function (im) { return ph(p.title, pid, im && im.id, 1200); }).join("") + '</div><div class="iteminfo">' +
+    '<div class="itemgrid"><div class="gallery">' + imgs.map(function (im, n) { return ph(p.title, pid, im && im.id, 1200, "", null, photoAlt(p.title, p.brandName, p.condition) + (imgs.length > 1 ? ", photo " + (n + 1) + " of " + imgs.length : "")); }).join("") + '</div><div class="iteminfo">' +
     "<h2>" + esc(p.title) + '</h2><div class="price" style="font-size:1.2rem;margin:4px 0">' + (v ? inr(v.pricePaise) : "") + (off ? ' <s class="muted small" style="font-weight:400">' + inr(v.mrpPaise) + '</s> <small>' + off + "% off</small>" : "") + '</div><div class="muted small">Price includes GST</div>' +
     (vs.length > 1 || (vs[0] && Object.keys(vs[0].options || {}).length) ? '<h3 style="margin:14px 0 6px">' + (vs.length > 1 ? "Choose an option" : "Option") + '</h3><div class="chips" style="flex-wrap:wrap">' + vs.map(function (x) { return '<button class="chip' + (v && x.id === v.id ? " on" : "") + '" data-a="vsel" data-i="' + esc(pid) + '" data-j="' + esc(x.id) + '"' + (x.inStock ? "" : ' style="opacity:.45;text-decoration:line-through"') + ">" + esc(variantLabel(x.options)) + "</button>"; }).join("") + "</div>" : "") +
     (v && v.onlyLeft ? '<div class="pill prog" style="display:inline-block">Only ' + v.onlyLeft + " left</div>" : "") +
     '<dl class="kv"><dt>Condition</dt><dd>' + esc(COND[p.condition] || p.condition) + "</dd><dt>Brand</dt><dd>" + esc(p.brandName || "Not stated") + "</dd><dt>Category</dt><dd>" + esc(p.categoryName || "") + "</dd>" +
-    Object.keys(p.attributes || {}).map(function (k) { return "<dt>" + esc(k) + "</dt><dd>" + esc(p.attributes[k]) + "</dd>"; }).join("") + "</dl>" +
+    Object.keys(p.attributes || {}).map(function (k) { return "<dt>" + esc(k.charAt(0).toUpperCase() + k.slice(1)) + "</dt><dd>" + esc(p.attributes[k]) + "</dd>"; }).join("") + "</dl>" +
     (p.description ? "<p>" + esc(p.description).replace(/\n/g, "<br>") + "</p>" : "") +
-    (p.seller ? '<button class="itemcard" data-a="seller" data-i="' + esc(p.seller.id) + '" data-j="' + esc(p.seller.displayName) + '" style="margin:12px 0"><span class="av" style="background:hsl(' + hueOf(p.seller.displayName) + ',40%,32%)">' + esc(String(p.seller.displayName).slice(0, 1).toUpperCase()) + '</span><span style="flex:1"><b>' + esc(p.seller.displayName) + '</b><br><span class="muted small">See more from this seller</span></span><span class="chev"></span></button>' : "") +
+    (p.seller ? '<button class="itemcard" data-a="seller" data-i="' + esc(p.seller.id) + '" data-j="' + esc(p.seller.displayName) + '" style="margin:12px 0"><span class="av" style="background:hsl(' + hueOf(p.seller.displayName) + ',40%,32%)">' + esc(String(p.seller.displayName).slice(0, 1).toUpperCase()) + '</span><span style="flex:1"><b>' + esc(p.seller.displayName) + '</b> <span class="pill ok">Verified seller</span><br><span class="muted small">See more from this seller</span></span><span class="chev"></span></button>' : "") +
     '<button class="btn ghost block" data-a="msgseller" data-i="' + esc(pid) + '" style="margin-bottom:10px">Message seller</button>' +
     (v && v.inStock ? (inCart ? '<div class="two"><button class="btn ghost" data-a="tab" data-i="cart">View cart (' + inCart.quantity + ')</button><button class="btn" data-a="addcart" data-i="' + esc(v.id) + '">Add one more</button></div>' : '<button class="btn block" data-a="addcart" data-i="' + esc(v.id) + '"' + (UI.busy ? " disabled" : "") + ">Add to cart</button>") : '<div class="banner">This option is sold out.</div>') +
-    '<p class="muted small" style="margin-top:10px">Buyer Protection and delivery fees are added at checkout.</p><p style="margin-top:6px"><button class="small muted" style="text-decoration:underline" data-a="reportitem" data-i="' + esc(pid) + '">Report this listing</button></p></div></div>';
+    // Only approved sellers' listings are public (the API's VISIBLE rule), so every seller shown here has been verified.
+    '<div class="banner trust" style="margin-top:12px"><b>Buyer Protection</b><span class="small muted">If it arrives damaged or fake, ask for a return within 7 days of delivery. Pay inside Reloved to stay covered. Buyer Protection and delivery fees are shown before you order.</span> <a class="small" href="/home/doc/how" data-a="go" data-i="doc" data-j="how">How it works</a></div>' +
+    '<p style="margin-top:6px"><button class="small muted" style="text-decoration:underline" data-a="share" data-i="' + esc(pid) + '">Share this item</button> · <button class="small muted" style="text-decoration:underline" data-a="reportitem" data-i="' + esc(pid) + '">Report this listing</button></p></div></div>';
 };
 function probText(p) {
   var code = p && (p.code || p), n = p && (p.available != null ? p.available : p.left);
@@ -543,7 +586,8 @@ function renderNav() {
   var badge = { cart: n, inbox: u };
   nav.innerHTML = tabs.map(function (t) {
     var on = (!stack.length && tab === t[0]) || (stack.length && t[0] === "inbox" && cur().v === "chat");
-    return '<button data-a="tab" data-i="' + t[0] + '" class="' + (on ? "on" : "") + '" aria-label="' + t[1] + '">' + t[2] + "<span>" + t[1] + "</span>" + (badge[t[0]] ? '<i class="dot">' + (badge[t[0]] > 9 ? "9+" : badge[t[0]]) + "</i>" : "") + "</button>";
+    // Cart is hidden from the phone tab bar by CSS (it sits in the home header there) and shown in the desktop top bar.
+    return '<button data-a="tab" data-i="' + t[0] + '" class="t-' + t[0] + (on ? " on" : "") + '" aria-label="' + t[1] + '">' + t[2] + "<span>" + t[1] + "</span>" + (badge[t[0]] ? '<i class="dot">' + (badge[t[0]] > 9 ? "9+" : badge[t[0]]) + "</i>" : "") + "</button>";
   }).join("");
 }
 // The tab title and canonical address follow the screen. Item and category pages also get these in the first HTML
@@ -592,10 +636,18 @@ async function act(a, i, j, el) {
     case "reload": location.reload(); return;
     case "modretry": Object.keys(modState).forEach(function (k) { if (modState[k] === "err") delete modState[k]; }); render(); return;
     case "nova": openHelpChat(); return;
+    case "share": {
+      var link = (window.APP_CONFIG.CANONICAL || location.origin) + itemUrl(i);
+      if (navigator.share) { try { await navigator.share({ title: PTITLE[i] || "Reloved", url: link }); } catch (e) { } return; }
+      try { await navigator.clipboard.writeText(link); toast("Link copied"); } catch (e) { toast(link); }
+      return;
+    }
     case "item": go("item", i); return;
     case "cat": UI.cat = i; navPush(); loadFeed(false); render(); return;
     case "browse": UI.cat = i; stack = []; tab = "home"; navPush(); loadFeed(false); render(); return;
-    case "fil": UI.fil = !UI.fil; render(); return;
+    case "fil": UI.fil = !UI.fil; if (UI.fil) loadBrands(); render(); return;
+    case "condtog": { var cs = condSet(), at = cs.indexOf(i); if (at > -1) cs.splice(at, 1); else cs.push(i); UI.cond = cs.join(","); loadFeed(false); render(); return; }
+    case "filclear": UI.cond = UI.brand = UI.size = UI.colour = UI.minp = UI.maxp = ""; UI.sort = ""; loadFeed(false); render(); return;
     case "more": loadFeed(true); return;
     case "feedretry": loadFeed(UI.feed.items.length > 0); return;
     case "seller": UI.sellerId = i; UI.sellerName = j; UI.cat = ""; UI.q = ""; stack = []; tab = "home"; navPush(); loadFeed(false); render(); return;
@@ -726,7 +778,7 @@ document.addEventListener("input", function (ev) {
 document.addEventListener("change", function (ev) {
   var t = ev.target;
   if (t.dataset && t.dataset.f) {
-    UI.sort = val("fs"); UI.cond = val("fc"); UI.minp = val("fmin"); UI.maxp = val("fmax");
+    UI.sort = val("fs"); UI.brand = val("fb"); UI.size = val("fz"); UI.colour = val("fcl"); UI.minp = val("fmin"); UI.maxp = val("fmax");
     clearTimeout(searchT); searchT = setTimeout(function () { loadFeed(false); }, 200);
   } else if (t.dataset && t.dataset.delv) {
     api.put("/cart/delivery/" + t.dataset.delv, { code: t.value }).then(function (r) { S.cart = r; render(); }, function (e) { toast(errText(e)); loadCart().then(render); });

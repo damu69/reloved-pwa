@@ -64,7 +64,12 @@ function editable(a) { return a.status === "draft" || a.status === "changes_requ
 
 /* ---------- Sell tab ---------- */
 V.sell = function () {
-  if (!R.signedIn()) return R.V.gate("Sell", "Sign in to start selling on Reloved.");
+  // Logged out: say what selling here involves before asking for an account.
+  if (!R.signedIn()) return head("Sell on Reloved") + '<section class="intro"><h2>Ready to clear your wardrobe?</h2><ul>' +
+    "<li><b>List in minutes.</b> Add photos, a price and the condition. Our team reviews each listing before it goes live.</li>" +
+    "<li><b>Get verified once.</b> Share your PAN, address and bank details so buyers know who they are buying from.</li>" +
+    "<li><b>See every rupee.</b> Your earnings show after commission and delivery, and are held for 14 days after payment in case of returns. Bank payouts are being switched on.</li></ul>" +
+    '<div class="intro-cta"><button class="btn" data-a="go" data-i="auth">Sign in or create account</button><a class="btn ghost" href="/home/doc/how" data-a="go" data-i="doc" data-j="how">How it works</a></div></section>';
   var c = need("sl:app", function () { return api.get("/seller/application").catch(function (e) { if (e.status === 404) return { none: true }; throw e; }); });
   if (c.st === "loading") return head("Sell") + R.loadingBox();
   if (c.st === "err") return head("Sell") + R.failBox(c.err);

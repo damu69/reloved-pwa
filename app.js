@@ -371,7 +371,7 @@ V.home = function () {
     subs.map(function (c) { return chip(c.path, c.name, UI.cat === c.path); }).join("") + "</div>" : "";
   var nf = filterCount(), plain = !UI.q.trim() && !UI.cat && !UI.sellerId && !nf;
   return '<div class="homehead"><h1 class="brand">Re<em>loved</em></h1>' + cartLink() + "</div>" +
-    '<div style="display:flex;gap:8px;margin-bottom:12px"><div class="search" style="flex:1"><span class="muted">&#9906;</span><input id="q" type="search" placeholder="Search for items" value="' + esc(UI.q) + '" aria-label="Search"></div><button class="chip' + (UI.fil || nf ? " on" : "") + '" data-a="fil" aria-expanded="' + UI.fil + '">Filters' + (nf ? " (" + nf + ")" : "") + "</button></div>" +
+    '<div class="searchrow"><div class="search" style="flex:1"><span class="muted">&#9906;</span><input id="q" type="search" placeholder="Search for items" value="' + esc(UI.q) + '" aria-label="Search"></div><button class="chip' + (UI.fil || nf ? " on" : "") + '" data-a="fil" aria-expanded="' + UI.fil + '">Filters' + (nf ? " (" + nf + ")" : "") + "</button></div>" +
     (UI.fil ? filtersHTML() : "") +
     '<div class="chips">' + chips + "</div>" + subchips +
     (plain && !UI.fil ? introHTML() : "") +

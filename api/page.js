@@ -101,7 +101,7 @@ function fill(html, page) {
   for (const k of Object.keys(og)) html = setTag(html, new RegExp('<meta property="' + k + '"[^>]*>'), '<meta property="' + k + '" content="' + esc(og[k]) + '">');
   // JSON-LD: "<" is escaped so a title can never close the script tag.
   html = html.replace("</head>", '<script type="application/ld+json">' + JSON.stringify(page.ld).replace(/</g, "\\u003c") + "</script>\n</head>");
-  return html.replace(/<div class="loading">[^<]*<\/div>/, page.body);
+  return html.replace(/<div class="loading">[\s\S]*?<\/div>(?=<\/main>)/, function () { return page.body; });
 }
 
 module.exports = async function handler(req, res) {

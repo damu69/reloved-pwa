@@ -2,7 +2,7 @@
 :root{
   --bg:#151311; --surface:#1e1b18; --surface2:#292521; --line:#38332d; --fg:#f2ece3; --muted:#a69d91;
   --accent:#e0b469; --accent-ink:#1c1409; --warn:#e69b4f; --warn-bg:#2e2314; --bad:#ee7467; --ok:#86c791;
-  --f-display:"Instrument Serif","Iowan Old Style","Palatino Linotype",Georgia,serif; --f-body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-display:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif; --f-logo:"Instrument Serif","Iowan Old Style","Palatino Linotype",Georgia,serif; --f-body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
   color-scheme:dark;
 }
 @media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
@@ -114,7 +114,7 @@ textarea.inp{min-height:90px;resize:vertical}
 .stars button{font-size:1.6rem;color:var(--line)} .stars button.on{color:var(--warn)}
 .steps{display:flex;gap:6px;margin:10px 0 14px}.steps i{flex:1;height:5px;border-radius:9px;background:var(--line)}.steps i.on{background:var(--accent)}
 .sum{display:flex;justify-content:space-between;padding:4px 0}.sum.total{border-top:1px solid var(--line);margin-top:6px;padding-top:10px;font-weight:700}
-.loading{display:grid;place-items:center;min-height:70vh;min-height:70dvh;color:var(--muted)}
+.loading{display:block}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .auth{padding-top:8vh}.auth .two{margin-top:8px}.install{margin-top:8px}
 /* Phase A (new backend) additions */
@@ -410,3 +410,29 @@ select.inp{appearance:auto}
   .nav .util-theme{flex:none;flex-direction:row;padding:4px;color:var(--fg)} .nav .util-theme svg{width:18px;height:18px}
   .nav .util-theme::before{display:none}
 }
+
+
+/* ===== One sans-serif for headings (Figtree bold); only the Reloved wordmark keeps the serif ===== */
+h1,h2,h3,.banner b,.tile,.cat-tile,.feat-tile b,.trio-tile b,.appban b,.sw-price{font-weight:700;letter-spacing:-.015em}
+h1{font-size:1.7rem} h2{font-size:1.3rem} h3{font-size:1.05rem}
+.sec-h h2{font-size:1.3rem}
+.hero-copy h2{font-size:2rem;line-height:1.1}
+.feat-tile b{font-size:1.5rem} .trio-tile b{font-size:1.2rem} .appban b{font-size:1.15rem} .cat-tile{font-size:1.1rem} .tile{font-size:1.15rem}
+.brand,.navbrand,.nav::before,.appban-logo{font-family:var(--f-logo);font-weight:400;letter-spacing:.01em}
+.sw-price{font-size:1.7rem}
+@media (min-width:900px){
+  h1{font-size:2rem} .listtitle{font-size:1.6rem} .sec-h h2{font-size:1.45rem}
+  .hero-copy h2{font-size:2.9rem}
+  .feat-tile b{font-size:2rem} .trio-tile b{font-size:1.4rem} .cat-tile{font-size:1.25rem}
+}
+
+/* ===== Loading skeletons ===== */
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sk{background:linear-gradient(110deg,var(--surface) 30%,var(--surface2) 50%,var(--surface) 70%);background-size:200% 100%;animation:shim 1.4s linear infinite;border-radius:6px}
+.sk-hero{height:clamp(200px,32vh,340px);border-radius:10px;margin-bottom:22px}
+.sk-img{aspect-ratio:3/4;border-radius:6px}
+.sk-img.sk-wide{aspect-ratio:4/3}
+.sk-line{height:12px;margin-top:9px;width:80%} .sk-line.s{width:45%}
+.sk-box{max-width:520px}
+#drops>div .sk-img{aspect-ratio:3/4}
+@media (prefers-reduced-motion:reduce){.sk{animation:none}}

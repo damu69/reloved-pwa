@@ -145,7 +145,7 @@ function failBox(msg, retry) { return '<div class="empty"><h2>Could not load</h2
 /* ============ state ============ */
 var S = { user: null, perms: [], cats: [], cart: null, wish: {}, ready: false };
 var stack = [], tab = "home";
-var UI = { q: "", cat: "", cond: "", brand: "", size: "", colour: "", sort: "", minp: "", maxp: "", sellerId: "", sellerName: "", fil: false, feed: { items: [], next: null, loading: false, error: null, key: "", loaded: false },
+var UI = { rate: {}, q: "", cat: "", cond: "", brand: "", size: "", colour: "", sort: "", minp: "", maxp: "", sellerId: "", sellerName: "", fil: false, feed: { items: [], next: null, loading: false, error: null, key: "", loaded: false },
   auth: { mode: "login", busy: false, err: "" }, ck: { addressId: "", idem: null, busy: false, adding: false, err: "" }, coupon: "", pdv: {}, confirm: null, busy: false };
 var C = {}; // per-view fetched data: key -> {st:"loading"|"ok"|"err", data, err}
 
@@ -411,6 +411,16 @@ function heroHTML() {
 function railWrap(title, id, inner) {
   return '<section class="sec"><div class="sec-h"><h2>' + esc(title) + '</h2><span class="rail-ctl"><button class="rnd" data-rail="prev" aria-label="Scroll left">' + ICON_PREV + '</button><button class="rnd" data-rail="next" aria-label="Scroll right">' + ICON_NEXT + '</button></span></div><div class="rail-track" ' + (id ? 'id="' + id + '"' : "") + ">" + inner + "</div></section>";
 }
+function starsText(avg, n) { return '<span class="stars" aria-label="Rated ' + avg + ' out of 5 from ' + n + (n === 1 ? " rating" : " ratings") + '"><i aria-hidden="true">★</i> <b>' + Number(avg).toFixed(1) + '</b> <span class="muted">(' + n + ")</span></span>"; }
+function loadTopSellers() { if (S.topSellers !== undefined) return; S.topSellers = null; api.get("/catalogue/sellers/top", { anon: true }).then(function (r) { S.topSellers = r.items || []; refresh(); }, function () { S.topSellers = []; }); }
+function sellersRailHTML() {
+  loadTopSellers();
+  var L = S.topSellers; if (L === null) return railWrap("Top rated sellers", "", '<div class="sk sk-seller"></div><div class="sk sk-seller"></div><div class="sk sk-seller"></div><div class="sk sk-seller"></div>');
+  if (!L.length) return "";
+  return railWrap("Top rated sellers", "", L.map(function (x) {
+    return '<button class="seller-tile" data-a="seller" data-i="' + esc(x.id) + '" data-j="' + esc(x.displayName) + '"><span class="av" style="background:hsl(' + hueOf(x.displayName) + ',40%,32%)">' + esc(String(x.displayName).slice(0, 1).toUpperCase()) + '</span><b>' + esc(x.displayName) + "</b>" + starsText(x.ratingAvg, x.ratingCount) + '<span class="muted small">' + x.itemCount + (x.itemCount === 1 ? " item" : " items") + "</span></button>";
+  }).join(""));
+}
 function dropsHTML() {
   var F = UI.feed; if (!F.loaded || F.loading && !F.items.length) return skCards(6); if (!F.items.length) return '<div class="muted small" style="padding:8px 0">New listings will appear here.</div>';
   return F.items.slice(0, 12).map(card).join("");
@@ -434,11 +444,6 @@ function trustTilesHTML() {
 function appBannerHTML() {
   return '<section class="appban"><span class="appban-logo" aria-hidden="true">Re<em>loved</em></span><b>It&rsquo;s better on the app</b><button class="btn sm pill-btn" data-a="install">Install Reloved</button></section>';
 }
-function brandGridHTML() {
-  var bs = (S.brands || []).slice(0, 16); if (!bs.length) return "";
-  return '<section class="sec"><div class="sec-h"><h2>Shop by brand</h2></div><div class="brandgrid">' +
-    bs.map(function (b) { var h = hueOf(b.name); return '<button class="brandcell" data-a="brandpick" data-i="' + esc(b.slug) + '"><span class="bdot" style="background:hsl(' + h + ',38%,34%)">' + esc(String(b.name).slice(0, 1).toUpperCase()) + "</span><span>" + esc(b.name) + "</span></button>"; }).join("") + "</div></section>";
-}
 function footerHTML() {
   var tops = topCats().slice(0, 6);
   return '<footer class="foot"><div class="foot-cols">' +
@@ -449,7 +454,7 @@ function footerHTML() {
     '<p class="foot-note">&copy; ' + new Date().getFullYear() + " Reloved. Preloved fashion from verified Indian sellers.</p></footer>";
 }
 function showcaseHTML() {
-  return heroHTML() + catRailHTML() + railWrap("Fresh drops", "drops", dropsHTML()) + featuredHTML() + trustTilesHTML() + appBannerHTML() + brandGridHTML();
+  return heroHTML() + catRailHTML() + railWrap("Fresh drops", "drops", dropsHTML()) + sellersRailHTML() + featuredHTML() + trustTilesHTML() + appBannerHTML();
 }
 // Cart as a header icon on phones (the bottom bar has five tabs); on desktop it stays in the top bar.
 function cartLink() {
@@ -483,7 +488,6 @@ V.home = function () {
   var subchips = subs.length ? '<div class="chips">' + chip(top, "All " + ((catByPath(top) || {}).name || ""), UI.cat === top) +
     subs.map(function (c) { return chip(c.path, c.name, UI.cat === c.path); }).join("") + "</div>" : "";
   var nf = filterCount(), plain = !UI.q.trim() && !UI.cat && !UI.sellerId && !nf;
-  if (plain) loadBrands();
   return '<div class="homehead"><h1 class="brand">Re<em>loved</em></h1>' + cartLink() + "</div>" +
     '<div class="searchrow"><div class="search" style="flex:1"><span class="muted">&#9906;</span><input id="q" type="search" placeholder="Search for items" value="' + esc(UI.q) + '" aria-label="Search"></div><button class="chip' + (UI.fil || nf ? " on" : "") + '" id="fbtn" data-a="fil" aria-expanded="' + UI.fil + '">Filters' + (nf ? " (" + nf + ")" : "") + "</button></div>" +
     '<div class="chips catchips">' + chips + "</div>" + subchips +
@@ -515,7 +519,7 @@ V.item = function (pid) {
     '<dl class="kv"><dt>Condition</dt><dd>' + esc(COND[p.condition] || p.condition) + "</dd><dt>Brand</dt><dd>" + esc(p.brandName || "Not stated") + "</dd><dt>Category</dt><dd>" + esc(p.categoryName || "") + "</dd>" +
     Object.keys(p.attributes || {}).map(function (k) { return "<dt>" + esc(k.charAt(0).toUpperCase() + k.slice(1)) + "</dt><dd>" + esc(p.attributes[k]) + "</dd>"; }).join("") + "</dl>" +
     (p.description ? "<p>" + esc(p.description).replace(/\n/g, "<br>") + "</p>" : "") +
-    (p.seller ? '<button class="itemcard" data-a="seller" data-i="' + esc(p.seller.id) + '" data-j="' + esc(p.seller.displayName) + '" style="margin:12px 0"><span class="av" style="background:hsl(' + hueOf(p.seller.displayName) + ',40%,32%)">' + esc(String(p.seller.displayName).slice(0, 1).toUpperCase()) + '</span><span style="flex:1"><b>' + esc(p.seller.displayName) + '</b> <span class="pill ok">Verified seller</span><br><span class="muted small">See more from this seller</span></span><span class="chev"></span></button>' : "") +
+    (p.seller ? '<button class="itemcard" data-a="seller" data-i="' + esc(p.seller.id) + '" data-j="' + esc(p.seller.displayName) + '" style="margin:12px 0"><span class="av" style="background:hsl(' + hueOf(p.seller.displayName) + ',40%,32%)">' + esc(String(p.seller.displayName).slice(0, 1).toUpperCase()) + '</span><span style="flex:1"><b>' + esc(p.seller.displayName) + '</b> <span class="pill ok">Verified seller</span><br>' + (p.seller.ratingCount ? starsText(p.seller.ratingAvg, p.seller.ratingCount) + ' <span class="muted small">· See more</span>' : '<span class="muted small">See more from this seller</span>') + '</span><span class="chev"></span></button>' : "") +
     // The buying action comes first, then the secondary one (Vinted: Buy now, Make an offer, Message seller).
     (v && v.inStock ? (inCart ? '<div class="two"><button class="btn ghost" data-a="tab" data-i="cart">View cart (' + inCart.quantity + ')</button><button class="btn" data-a="addcart" data-i="' + esc(v.id) + '">Add one more</button></div>' : '<button class="btn block" data-a="addcart" data-i="' + esc(v.id) + '"' + (UI.busy ? " disabled" : "") + ">Add to cart</button>") : '<div class="banner">This option is sold out.</div>') +
     '<button class="btn ghost block" data-a="msgseller" data-i="' + esc(pid) + '" style="margin-top:10px">Message seller</button>' +
@@ -610,6 +614,19 @@ V.orders = function () {
   var o = c.data.items || [];
   return out + (o.length ? '<div class="list">' + o.map(function (x) { return '<button class="row" data-a="order" data-i="' + esc(x.id) + '"><span class="l"><b>Order ' + esc(x.number) + '</b><br><span class="muted small">' + when(x.placedAt) + " · " + x.itemCount + (x.itemCount === 1 ? " item" : " items") + '</span><br><span class="price">' + inr(x.totalPaise) + '</span></span><span class="pill ' + stClass(x.status) + '">' + esc(stLabel(x.status)) + "</span></button>"; }).join("") + "</div>" : '<div class="empty"><h2>No orders yet</h2>When you place an order it shows up here.</div>');
 };
+function rateBoxHTML(pk, rc) {
+  if (!rc || rc.st === "loading") return '<div class="ratebox"><div class="sk" style="height:18px;width:50%"></div></div>';
+  if (rc.st === "err") return "";
+  var ex = (rc.data.items || []).filter(function (r) { return r.packageId === pk.id; })[0], f = UI.rate[pk.id];
+  if (ex && !f) {
+    return '<div class="ratebox"><b>Your rating for ' + esc(pk.sellerName) + '</b><div class="stars-row" aria-label="You gave ' + ex.stars + ' out of 5">' + "★".repeat(ex.stars) + '<span class="off">' + "★".repeat(5 - ex.stars) + "</span></div>" + (ex.comment ? '<p class="small" style="margin:4px 0">' + esc(ex.comment) + "</p>" : "") +
+      (ex.canEdit ? '<button class="btn ghost sm" data-a="redit" data-i="' + esc(pk.id) + '">Change rating</button>' : '<span class="muted small">Ratings can be changed for 7 days.</span>') + "</div>";
+  }
+  f = f || { stars: 0, comment: "" };
+  var st = "";
+  for (var n = 1; n <= 5; n++) st += '<button class="star' + (n <= f.stars ? " on" : "") + '" data-a="rstar" data-i="' + esc(pk.id) + '" data-j="' + n + '" aria-label="' + n + (n === 1 ? " star" : " stars") + '" aria-pressed="' + (n === f.stars) + '">★</button>';
+  return '<div class="ratebox"><b>' + (ex ? "Change your rating" : "Rate " + esc(pk.sellerName)) + '</b><div class="stars-row">' + st + '</div><textarea class="inp" id="rc-' + esc(pk.id) + '" maxlength="300" rows="2" placeholder="Add a comment (optional)">' + esc(f.comment) + '</textarea><div class="ratebtns"><button class="btn sm" data-a="rsave" data-i="' + esc(pk.id) + '"' + (f.stars ? "" : " disabled") + '>Submit rating</button>' + (ex ? '<button class="btn ghost sm" data-a="rcancel" data-i="' + esc(pk.id) + '">Cancel</button>' : "") + "</div></div>";
+}
 V.order = function (id) {
   if (!signedIn()) return V.gate("Order", "Sign in to see this order.");
   var c = need("order:" + id, function () { return api.get("/orders/" + id); });
@@ -619,9 +636,10 @@ V.order = function (id) {
   var out = head("Order " + esc(o.number), true) + '<p><span class="pill ' + stClass(o.status) + '">' + esc(stLabel(o.status)) + '</span> <span class="muted small">Placed ' + when(o.placedAt) + "</span></p>";
   if (unpaid) out += '<div class="banner warn"><b>Waiting for payment</b><span class="small">Online payment is not switched on yet, so this order cannot be paid for now. It is released automatically at ' + when(o.expiresAt) + ".</span></div>";
   if (o.cancelledAt) out += '<div class="banner"><b>Cancelled</b><span class="small muted">' + esc(o.cancelReason || "") + "</span></div>";
+  var rc = o.packages.some(function (pk) { return pk.status === "delivered"; }) ? need("ratings:mine", function () { return api.get("/ratings/mine"); }) : null;
   o.packages.forEach(function (pk) {
     out += '<h3 style="margin:14px 0 6px">From ' + esc(pk.sellerName) + ' <span class="pill ' + stClass(pk.status) + '">' + esc(stLabel(pk.status)) + '</span></h3><div class="list">' + pk.items.map(function (i) { return '<button class="row" data-a="item" data-i="' + esc(i.productId) + '"><span class="l"><b>' + esc(i.title) + '</b><br><span class="muted small">' + esc(variantLabel(i.options)) + " × " + i.quantity + '</span></span><span class="v">' + inr(i.netPaise) + "</span></button>"; }).join("") + "</div>" +
-      '<p class="muted small">' + esc(pk.delivery.label) + " · " + (pk.delivery.feePaise ? inr(pk.delivery.feePaise) : "Free") + (pk.carrier ? " · " + esc(pk.carrier) + " " + esc(pk.trackingNumber || "") : "") + "</p>" +
+      '<p class="muted small">' + esc(pk.delivery.label) + " · " + (pk.delivery.feePaise ? inr(pk.delivery.feePaise) : "Free") + (pk.carrier ? " · " + esc(pk.carrier) + " " + esc(pk.trackingNumber || "") : "") + "</p>" + (pk.status === "delivered" ? rateBoxHTML(pk, rc) : "") +
       (o.paymentStatus !== "unpaid" && o.status !== "cancelled" && (pk.status === "confirmed" || pk.status === "processing") ? '<button class="btn danger sm" data-a="pcancel" data-i="' + esc(o.id) + '" data-j="' + esc(pk.id) + '">' + (UI.confirm === pk.id ? "Tap again to cancel this package" : "Cancel this package") + "</button>" : "");
   });
   out += '<div style="margin-top:14px">' + sum("Items", inr(t.itemsSubtotalPaise)) + (t.discountPaise ? sum("Coupon discount", "−" + inr(t.discountPaise)) : "") + sum("Delivery", t.deliveryPaise ? inr(t.deliveryPaise) : "Free") + sum("Buyer Protection", inr(t.buyerProtectionPaise)) + sum("Total", inr(t.totalPaise), "total") + "</div>" +
@@ -789,7 +807,6 @@ async function act(a, i, j, el) {
       loadFeed(false); render(); return;
     }
     case "scrolllist": { var lt = $("listing-top"); if (lt) lt.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
-    case "brandpick": UI.brand = i; loadFeed(false); render(); var lt2 = $("listing-top"); if (lt2) lt2.scrollIntoView({ block: "start" }); return;
     case "hidefil": UI.hidefil = !UI.hidefil; render(); return;
     case "fil": UI.fil = !UI.fil; if (UI.fil) loadBrands(); render(); return;
     case "condtog": { var cs = condSet(), at = cs.indexOf(i); if (at > -1) cs.splice(at, 1); else cs.push(i); UI.cond = cs.join(","); loadFeed(false); render(); return; }
@@ -866,6 +883,18 @@ async function act(a, i, j, el) {
       if (UI.confirm !== i) { UI.confirm = i; render(); return; }
       UI.confirm = null;
       try { await api.post("/orders/" + i + "/cancel", { reason: "Cancelled by buyer" }); toast("Order cancelled"); drop("order"); drop("orders"); await loadCart(); }
+      catch (e) { toast(errText(e)); }
+      render(); return;
+    }
+    case "rstar": case "redit": case "rcancel": case "rsave": {
+      var ta = document.getElementById("rc-" + i), cur = UI.rate[i], ex0 = ((C["ratings:mine"] || {}).data || { items: [] }).items.filter(function (r) { return r.packageId === i; })[0];
+      if (a === "rcancel") { delete UI.rate[i]; render(); return; }
+      if (a === "redit") { UI.rate[i] = { stars: ex0 ? ex0.stars : 0, comment: ex0 && ex0.comment || "" }; render(); return; }
+      cur = cur || { stars: ex0 ? ex0.stars : 0, comment: "" };
+      if (ta) cur.comment = ta.value;
+      if (a === "rstar") { cur.stars = Number(j); UI.rate[i] = cur; render(); return; }
+      if (!cur.stars) { toast("Choose 1 to 5 stars"); return; }
+      try { await api.put("/ratings/packages/" + i, { stars: cur.stars, comment: cur.comment.trim() || undefined }); toast("Thanks for rating this seller."); delete UI.rate[i]; drop("ratings:"); drop("order:"); S.topSellers = undefined; }
       catch (e) { toast(errText(e)); }
       render(); return;
     }

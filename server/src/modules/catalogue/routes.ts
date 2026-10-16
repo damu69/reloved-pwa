@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { sellerRatingSummary } from "../ratings/routes.js";
 import { z } from "zod";
 import { parse, safeText, uuid } from "../../lib/validate.js";
 import { AppError, Errors } from "../../lib/errors.js";
@@ -384,7 +385,7 @@ export async function publicCatalogueRoutes(app: FastifyInstance): Promise<void>
     return {
       id: d.id, title: d.title, description: d.description, condition: d.condition, attributes: d.attributes,
       categoryPath: d.categoryPath, categoryName: d.categoryName, brandName: d.brandName, gstRateBp: d.gstRateBp, currency: d.currency,
-      seller: { id: d.seller.id, displayName: d.seller.displayName },
+      seller: { id: d.seller.id, displayName: d.seller.displayName, ...(await sellerRatingSummary(app.db, d.seller.id)) },
       // Exact stock is not published; buyers see whether a variant can be bought and "only N left" when few remain.
       variants: d.variants.filter((v) => v.isActive).map(({ isActive: _a, ...v }) => {
         const n = avail.get(v.id) ?? 0;

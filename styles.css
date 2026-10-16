@@ -392,7 +392,7 @@ select.inp{appearance:auto}
 @media (min-width:900px){
   .rail-ctl{display:flex}
   #drops>div{flex-basis:230px} .cat-tile{flex-basis:210px;font-size:1.5rem}
-  .hero-slide{min-height:430px;padding-bottom:80px}
+  .hero-slide{min-height:clamp(320px,46vh,430px);padding-bottom:80px}
   .hero-copy h2{font-size:3.4rem}
   .feat-tile{min-height:320px;padding:28px}
   .feat-tile b{font-size:2.4rem}
@@ -402,7 +402,7 @@ select.inp{appearance:auto}
   .grid{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
   .brandgrid{grid-template-columns:repeat(8,minmax(0,1fr))}
   /* two-row header: a thin utility strip above the logo/search row (Nike's top bar) */
-  .utilbar{display:flex;order:-1;flex:0 0 100%;align-items:center;justify-content:space-between;gap:16px;background:var(--surface);border-bottom:1px solid var(--line);margin-inline:calc(-1 * max(24px,calc((100% - 1180px)/2)));padding:6px max(24px,calc((100% - 1180px)/2));font-size:.8rem}
+  .utilbar{display:flex;order:-1;flex:0 0 100%;align-items:center;justify-content:space-between;gap:16px;padding:6px 0;font-size:.8rem;background:var(--surface);box-shadow:0 0 0 100vmax var(--surface);clip-path:inset(0 -100vmax)}
   .util-msg{color:var(--muted)}
   .util-links{display:flex;align-items:center;gap:14px}
   .util-links a{color:var(--fg);text-decoration:none;font-weight:600} .util-links a:hover{text-decoration:underline}

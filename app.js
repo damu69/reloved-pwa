@@ -338,6 +338,7 @@ function countText() {
 }
 function partialFeed() {
   var g = $("grid"), m = $("more"), c = $("count"), a = $("actives"), b = $("fbtn");
+  var dr = $("drops"); if (dr) dr.innerHTML = dropsHTML();
   if (g) g.innerHTML = gridHTML(); if (m) m.innerHTML = moreHTML(); if (c) c.textContent = countText(); if (a) a.innerHTML = activesHTML();
   if (b) { var nf = filterCount(); b.textContent = "Filters" + (nf ? " (" + nf + ")" : ""); b.classList.toggle("on", UI.fil || !!nf); }
 }
@@ -365,7 +366,7 @@ function toolbarHTML() {
   return (UI.cat ? crumbsHTML(UI.cat, true) : "") +
     '<div class="toolbar"><div class="tb-l"><h2 class="listtitle">' + esc(listTitle()) + '</h2><span class="count" id="count" aria-live="polite">' + countText() + "</span>" +
     (UI.sellerId ? '<button class="chip" data-a="clearseller">Show all</button>' : "") + "</div>" +
-    '<label class="sortsel"><span>Sort</span><select class="inp" id="fs" data-f="1">' + opt("", UI.q.trim() ? "Best match" : "Newest", UI.sort) + opt("price_asc", "Price: low to high", UI.sort) + opt("price_desc", "Price: high to low", UI.sort) + "</select></label></div>" +
+    '<span class="tb-r"><button class="linkbtn hidefil" data-a="hidefil">' + (UI.hidefil ? "Show filters" : "Hide filters") + '</button>' + '<label class="sortsel"><span>Sort</span><select class="inp" id="fs" data-f="1">' + opt("", UI.q.trim() ? "Best match" : "Newest", UI.sort) + opt("price_asc", "Price: low to high", UI.sort) + opt("price_desc", "Price: high to low", UI.sort) + "</select></label></span></div>" +
     '<div class="actives" id="actives">' + activesHTML() + "</div>";
 }
 // The filters in use, each removable with one tap, plus "Clear all" (Vinted shows these under its filter row).
@@ -389,6 +390,66 @@ function introHTML() {
     "<li><b>Indian closets.</b> Kurtas, sarees, sneakers and more, priced in rupees.</li></ul>" +
     '<div class="intro-cta"><a class="btn ghost sm" href="/home/doc/how" data-a="go" data-i="doc" data-j="how">How it works</a><a class="btn sm" href="/sell" data-a="tab" data-i="sell">Sell your clothes</a></div></section>';
 }
+
+// ---- Home showcase: layout taken from the Nike and Foot Locker home pages (hero carousel, category tiles, a "fresh drops"
+// rail, a brand grid, an app banner and a footer), with Reloved's own words and colour panels instead of photos. ----
+var HERO = [
+  { k: "a", h: "Preloved, checked, protected.", p: "Verified sellers and Buyer Protection on every order.", b: "Shop now", a: 'data-a="scrolllist"' },
+  { k: "b", h: "Clear out your closet.", p: "List what you no longer wear and reach buyers across India.", b: "Start selling", a: 'data-a="tab" data-i="sell"' },
+  { k: "c", h: "Swipe to find your next favourite.", p: "Right to message the seller, left to skip.", b: "Open Discover", a: 'data-a="tab" data-i="discover"' }
+];
+var ICON_PREV = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>', ICON_NEXT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
+function heroHTML() {
+  return '<section class="hero" aria-roledescription="carousel" aria-label="Highlights"><div class="hero-track" id="herotrack" tabindex="0">' +
+    HERO.map(function (s, n) {
+      return '<div class="hero-slide hs-' + s.k + '" role="group" aria-roledescription="slide" aria-label="' + (n + 1) + " of " + HERO.length + '"><div class="hero-copy"><h2>' + esc(s.h) + "</h2><p>" + esc(s.p) + '</p><button class="btn pill-btn" ' + s.a + ">" + esc(s.b) + "</button></div></div>";
+    }).join("") + '</div><div class="hero-ctl"><span class="hero-dots" id="herodots">' + HERO.map(function (s, n) { return "<i" + (n ? "" : ' class="on"') + "></i>"; }).join("") + "</span>" +
+    '<button class="rnd" data-hero="pause" id="heropause" aria-label="Pause slides"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg></button>' +
+    '<button class="rnd" data-hero="prev" aria-label="Previous slide">' + ICON_PREV + '</button><button class="rnd" data-hero="next" aria-label="Next slide">' + ICON_NEXT + "</button></div></section>";
+}
+function railWrap(title, id, inner) {
+  return '<section class="sec"><div class="sec-h"><h2>' + esc(title) + '</h2><span class="rail-ctl"><button class="rnd" data-rail="prev" aria-label="Scroll left">' + ICON_PREV + '</button><button class="rnd" data-rail="next" aria-label="Scroll right">' + ICON_NEXT + '</button></span></div><div class="rail-track" ' + (id ? 'id="' + id + '"' : "") + ">" + inner + "</div></section>";
+}
+function dropsHTML() {
+  var F = UI.feed; if (!F.items.length) return '<div class="muted small" style="padding:8px 0">New listings will appear here.</div>';
+  return F.items.slice(0, 12).map(card).join("");
+}
+function catRailHTML() {
+  var tops = topCats(); if (!tops.length) return "";
+  return '<section class="sec"><div class="sec-h"><h2>Shop by category</h2><span class="rail-ctl"><button class="rnd" data-rail="prev" aria-label="Scroll left">' + ICON_PREV + '</button><button class="rnd" data-rail="next" aria-label="Scroll right">' + ICON_NEXT + '</button></span></div><div class="rail-track cat-rail">' +
+    tops.map(function (c) { var h = hueOf(c.name); return '<a class="cat-tile" href="' + esc(catUrl(c.path)) + '" data-a="browse" data-i="' + esc(c.path) + '" data-j="reset" style="background:' + TONES[h % TONES.length] + '"><span>' + esc(c.name) + "</span></a>"; }).join("") + "</div></section>";
+}
+function featuredHTML() {
+  return '<section class="sec"><div class="sec-h"><h2>Featured</h2></div><div class="feat">' +
+    '<a class="feat-tile ft-a" href="/sell" data-a="tab" data-i="sell"><span class="ft-k">For sellers</span><b>Sell what you no longer wear</b><span class="pill-btn btn sm">List an item</span></a>' +
+    '<a class="feat-tile ft-b" href="/discover" data-a="tab" data-i="discover"><span class="ft-k">For buyers</span><b>Swipe through new listings</b><span class="pill-btn btn sm">Discover</span></a></div></section>';
+}
+function trustTilesHTML() {
+  return '<section class="sec"><div class="sec-h"><h2>Why Reloved</h2></div><div class="trio">' +
+    '<a class="trio-tile tt-a" href="/home/doc/how" data-a="go" data-i="doc" data-j="how"><b>Verified sellers</b><span>Every seller is checked and every listing reviewed.</span></a>' +
+    '<a class="trio-tile tt-b" href="/home/doc/how" data-a="go" data-i="doc" data-j="how"><b>Buyer Protection</b><span>Damaged or fake? Return it within 7 days.</span></a>' +
+    '<a class="trio-tile tt-c" href="/home/doc/how" data-a="go" data-i="doc" data-j="how"><b>Priced in rupees</b><span>Indian closets, with delivery fees shown before you order.</span></a></div></section>';
+}
+function appBannerHTML() {
+  return '<section class="appban"><span class="appban-logo" aria-hidden="true">Re<em>loved</em></span><b>It&rsquo;s better on the app</b><button class="btn sm pill-btn" data-a="install">Install Reloved</button></section>';
+}
+function brandGridHTML() {
+  var bs = (S.brands || []).slice(0, 16); if (!bs.length) return "";
+  return '<section class="sec"><div class="sec-h"><h2>Shop by brand</h2></div><div class="brandgrid">' +
+    bs.map(function (b) { var h = hueOf(b.name); return '<button class="brandcell" data-a="brandpick" data-i="' + esc(b.slug) + '"><span class="bdot" style="background:hsl(' + h + ',38%,34%)">' + esc(String(b.name).slice(0, 1).toUpperCase()) + "</span><span>" + esc(b.name) + "</span></button>"; }).join("") + "</div></section>";
+}
+function footerHTML() {
+  var tops = topCats().slice(0, 6);
+  return '<footer class="foot"><div class="foot-cols">' +
+    "<div><h3>Shop</h3>" + (tops.length ? tops.map(function (c) { return '<a href="' + esc(catUrl(c.path)) + '" data-a="browse" data-i="' + esc(c.path) + '" data-j="reset">' + esc(c.name) + "</a>"; }).join("") : '<a href="/" data-a="browse" data-i="" data-j="reset">Just listed</a>') + "</div>" +
+    '<div><h3>Sell</h3><a href="/sell" data-a="tab" data-i="sell">Sell your clothes</a><a href="/discover" data-a="tab" data-i="discover">Discover</a></div>' +
+    '<div><h3>Help</h3><a href="/home/doc/how" data-a="go" data-i="doc" data-j="how">How it works</a><a href="/home/help" data-a="go" data-i="help">Help Centre</a><a href="/home/about" data-a="go" data-i="about">About us</a></div>' +
+    '<div><h3>Legal</h3><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a><a href="/delete-account.html">Delete account</a></div></div>' +
+    '<p class="foot-note">&copy; ' + new Date().getFullYear() + " Reloved. Preloved fashion from verified Indian sellers.</p></footer>";
+}
+function showcaseHTML() {
+  return heroHTML() + catRailHTML() + railWrap("Fresh drops", "drops", dropsHTML()) + featuredHTML() + trustTilesHTML() + appBannerHTML() + brandGridHTML();
+}
 // Cart as a header icon on phones (the bottom bar has five tabs); on desktop it stays in the top bar.
 function cartLink() {
   var n = cartCount();
@@ -403,12 +464,13 @@ function loadBrands() { if (S.brands) return; S.brands = []; api.get("/catalogue
 function opt(v, label, cur) { return '<option value="' + esc(v) + '"' + (v === cur ? " selected" : "") + ">" + esc(label) + "</option>"; }
 function filtersHTML() {
   var cs = condSet();
+  function grp(title, body, open) { return '<details class="fgrp"' + (open === false ? "" : " open") + "><summary>" + title + "</summary>" + body + "</details>"; }
   return '<div class="banner filters"><h3 class="filtitle">Filters</h3>' +
-    '<label class="field"><span>Brand</span><select class="inp" id="fb" data-f="1">' + opt("", "Any brand", UI.brand) + (S.brands || []).map(function (b) { return opt(b.slug, b.name, UI.brand); }).join("") + "</select></label>" +
-    '<div class="field"><span>Condition</span><div class="chips wrap">' + Object.keys(COND).map(function (k) { var on = cs.indexOf(k) > -1; return '<button class="chip' + (on ? " on" : "") + '" data-a="condtog" data-i="' + k + '" aria-pressed="' + on + '">' + COND[k] + "</button>"; }).join("") + "</div></div>" +
-    '<div class="two"><label class="field"><span>Size</span><input class="inp" id="fz" data-f="1" list="fzl" value="' + esc(UI.size) + '" placeholder="Any, e.g. M or UK 7" autocomplete="off"><datalist id="fzl">' + SIZES.map(function (s) { return '<option value="' + s + '">'; }).join("") + "</datalist></label>" +
-    '<label class="field"><span>Colour</span><select class="inp" id="fcl" data-f="1">' + opt("", "Any colour", UI.colour) + COLOURS.map(function (c) { return opt(c, c, UI.colour); }).join("") + "</select></label></div>" +
-    '<div class="two"><label class="field"><span>Min price (₹)</span><input class="inp" id="fmin" data-f="1" inputmode="numeric" value="' + esc(UI.minp) + '" placeholder="0"></label><label class="field"><span>Max price (₹)</span><input class="inp" id="fmax" data-f="1" inputmode="numeric" value="' + esc(UI.maxp) + '" placeholder="No limit"></label></div>' +
+    grp("Brand", '<label class="field"><select class="inp" id="fb" data-f="1" aria-label="Brand">' + opt("", "Any brand", UI.brand) + (S.brands || []).map(function (b) { return opt(b.slug, b.name, UI.brand); }).join("") + "</select></label>") +
+    grp("Condition", '<div class="field"><div class="chips wrap">' + Object.keys(COND).map(function (k) { var on = cs.indexOf(k) > -1; return '<button class="chip' + (on ? " on" : "") + '" data-a="condtog" data-i="' + k + '" aria-pressed="' + on + '">' + COND[k] + "</button>"; }).join("") + "</div></div>") +
+    grp("Size and colour", '<div class="two"><label class="field"><span>Size</span><input class="inp" id="fz" data-f="1" list="fzl" value="' + esc(UI.size) + '" placeholder="Any, e.g. M or UK 7" autocomplete="off"><datalist id="fzl">' + SIZES.map(function (s) { return '<option value="' + s + '">'; }).join("") + "</datalist></label>" +
+      '<label class="field"><span>Colour</span><select class="inp" id="fcl" data-f="1">' + opt("", "Any colour", UI.colour) + COLOURS.map(function (c) { return opt(c, c, UI.colour); }).join("") + "</select></label></div>") +
+    grp("Price", '<div class="two"><label class="field"><span>Min (₹)</span><input class="inp" id="fmin" data-f="1" inputmode="numeric" value="' + esc(UI.minp) + '" placeholder="0"></label><label class="field"><span>Max (₹)</span><input class="inp" id="fmax" data-f="1" inputmode="numeric" value="' + esc(UI.maxp) + '" placeholder="No limit"></label></div>') +
     (filterCount() ? '<button class="btn ghost sm" data-a="filclear">Clear filters</button>' : "") + "</div>";
 }
 V.home = function () {
@@ -420,13 +482,14 @@ V.home = function () {
   var subchips = subs.length ? '<div class="chips">' + chip(top, "All " + ((catByPath(top) || {}).name || ""), UI.cat === top) +
     subs.map(function (c) { return chip(c.path, c.name, UI.cat === c.path); }).join("") + "</div>" : "";
   var nf = filterCount(), plain = !UI.q.trim() && !UI.cat && !UI.sellerId && !nf;
+  if (plain) loadBrands();
   return '<div class="homehead"><h1 class="brand">Re<em>loved</em></h1>' + cartLink() + "</div>" +
     '<div class="searchrow"><div class="search" style="flex:1"><span class="muted">&#9906;</span><input id="q" type="search" placeholder="Search for items" value="' + esc(UI.q) + '" aria-label="Search"></div><button class="chip' + (UI.fil || nf ? " on" : "") + '" id="fbtn" data-a="fil" aria-expanded="' + UI.fil + '">Filters' + (nf ? " (" + nf + ")" : "") + "</button></div>" +
     '<div class="chips catchips">' + chips + "</div>" + subchips +
-    (plain && !UI.fil ? introHTML() : "") +
+    (plain && !UI.fil ? showcaseHTML() : "") +
     // Filters: a panel under the chips on phones (opened by the Filters button), a sidebar beside the grid on laptops.
-    '<div class="listing"><aside class="side' + (UI.fil ? " open" : "") + '" aria-label="Filters">' + filtersHTML() + "</aside>" +
-    '<div class="listing-main">' + toolbarHTML() + '<div class="grid" id="grid">' + gridHTML() + '</div><div id="more" style="margin-top:14px">' + moreHTML() + "</div></div></div>";
+    '<div class="listing' + (UI.hidefil ? " nofil" : "") + '" id="listing-top"><aside class="side' + (UI.fil ? " open" : "") + '" aria-label="Filters">' + filtersHTML() + "</aside>" +
+    '<div class="listing-main">' + toolbarHTML() + '<div class="grid" id="grid">' + gridHTML() + '</div><div id="more" style="margin-top:14px">' + moreHTML() + "</div></div></div>" + (plain ? footerHTML() : "");
 };
 V.browse = function () {
   var tops = topCats();
@@ -652,7 +715,10 @@ function renderNav() {
     '<form class="navsearch" id="nf" role="search"><span class="muted" aria-hidden="true">&#9906;</span><input id="nq" type="search" placeholder="Search for items" aria-label="Search for items" value="' + esc(UI.q) + '"></form>';
   var catRow = '<div class="navcats" role="navigation" aria-label="Categories"><a href="/" data-a="browse" data-i="" data-j="reset" class="' + (onHome && !UI.cat && !UI.q.trim() ? "on" : "") + '">Just listed</a>' +
     topCats().map(function (c) { return '<a href="' + esc(catUrl(c.path)) + '" data-a="browse" data-i="' + esc(c.path) + '" data-j="reset" class="' + (onHome && topc === c.path ? "on" : "") + '">' + esc(c.name) + "</a>"; }).join("") + "</div>";
-  nav.innerHTML = brandAndSearch + tabs.map(function (t) {
+  var util = '<div class="utilbar"><span class="util-msg">Buyer Protection on every order &middot; Meet-up delivery is free</span><span class="util-links"><a href="/home/help" data-a="go" data-i="help">Help</a><a href="/sell" data-a="tab" data-i="sell">Sell</a>' +
+    (signedIn() ? '<a href="/profile" data-a="tab" data-i="profile">Hi, ' + esc(String((S.user && S.user.fullName) || "there").split(" ")[0]) + "</a>" : '<a href="/profile" data-a="tab" data-i="profile">Sign up</a><a href="/profile" data-a="tab" data-i="profile">Log in</a>') +
+    '<button data-a="theme" class="util-theme" aria-label="Switch light or dark theme"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></button></span></div>';
+  nav.innerHTML = util + brandAndSearch + tabs.map(function (t) {
     var on = (!stack.length && tab === t[0]) || (stack.length && t[0] === "inbox" && cur().v === "chat");
     // Cart is hidden from the phone tab bar by CSS (it sits in the home header there) and shown in the desktop top bar.
     return '<button data-a="tab" data-i="' + t[0] + '" class="t-' + t[0] + (on ? " on" : "") + '" aria-label="' + t[1] + '">' + t[2] + "<span>" + t[1] + "</span>" + (badge[t[0]] ? '<i class="dot">' + (badge[t[0]] > 9 ? "9+" : badge[t[0]]) + "</i>" : "") + "</button>";
@@ -721,6 +787,9 @@ async function act(a, i, j, el) {
       else UI[i] = "";
       loadFeed(false); render(); return;
     }
+    case "scrolllist": { var lt = $("listing-top"); if (lt) lt.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    case "brandpick": UI.brand = i; loadFeed(false); render(); var lt2 = $("listing-top"); if (lt2) lt2.scrollIntoView({ block: "start" }); return;
+    case "hidefil": UI.hidefil = !UI.hidefil; render(); return;
     case "fil": UI.fil = !UI.fil; if (UI.fil) loadBrands(); render(); return;
     case "condtog": { var cs = condSet(), at = cs.indexOf(i); if (at > -1) cs.splice(at, 1); else cs.push(i); UI.cond = cs.join(","); loadFeed(false); render(); return; }
     case "filclear": UI.cond = UI.brand = UI.size = UI.colour = UI.minp = UI.maxp = ""; UI.sort = ""; loadFeed(false); render(); return;
@@ -811,7 +880,7 @@ async function act(a, i, j, el) {
     case "signoutall": try { await api.post("/auth/logout-all"); } catch (e) { } await api.logout(); clearSession(); stack = []; tab = "home"; toast("Signed out everywhere"); render(); return;
     case "savename": try { var r2 = await api.patch("/me", { fullName: val("setn") }); S.user = r2.user; toast("Name saved"); } catch (e) { toast(errText(e)); } render(); return;
     case "savepw": try { await api.post("/auth/password/change", { currentPassword: $("pw0").value, newPassword: $("pw1").value }); toast("Password changed"); $("pw0").value = ""; $("pw1").value = ""; } catch (e) { toast(errText(e)); } return;
-    case "theme": { var rt = document.documentElement, dark = getComputedStyle(rt).colorScheme === "dark"; rt.setAttribute("data-theme", dark ? "light" : "dark"); return; }
+    case "theme": { var rt = document.documentElement, dark = getComputedStyle(rt).colorScheme === "dark"; rt.setAttribute("data-theme", dark ? "light" : "dark"); try { localStorage.setItem("rl-theme", dark ? "light" : "dark"); } catch (e) { } return; }
     case "install": if (deferredInstall) { deferredInstall.prompt(); deferredInstall = null; } else toast("On iPhone: Share, then Add to Home Screen. On Android: browser menu, then Install app."); return;
     default: if (window.RL && RL.A[a]) { await RL.A[a](i, j, el); return; }
   }

@@ -360,11 +360,6 @@ select.inp{appearance:auto}
 .appban b{font-family:var(--f-display);font-weight:400;font-size:1.5rem}
 .appban-logo{font-family:var(--f-display);font-size:1.5rem;background:var(--bg);border-radius:10px;padding:4px 12px}
 .appban-logo em{color:var(--accent)}
-.brandgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 8px}
-.brandcell{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:.78rem;text-align:center;color:var(--muted);min-width:0}
-.brandcell span:last-child{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bdot{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:1.2rem}
-.brandcell:hover{color:var(--fg)}
 #listing-top{scroll-margin-top:calc(var(--navh) + 12px);margin-top:28px}
 .tb-r{display:flex;align-items:center;gap:14px}
 .hidefil{display:none}
@@ -384,7 +379,6 @@ select.inp{appearance:auto}
 @media (prefers-reduced-motion:reduce){.hero-track{scroll-behavior:auto}}
 @media (min-width:600px){
   .feat{grid-template-columns:1fr 1fr} .trio{grid-template-columns:repeat(3,1fr)}
-  .brandgrid{grid-template-columns:repeat(8,minmax(0,1fr))}
   .foot-cols{grid-template-columns:repeat(4,minmax(0,1fr))}
   #drops>div{flex-basis:190px} .cat-tile{flex-basis:170px}
   .hero-slide{min-height:340px}
@@ -400,7 +394,6 @@ select.inp{appearance:auto}
   .hidefil{display:inline-block}
   .listing.nofil{grid-template-columns:minmax(0,1fr)} .listing.nofil .side{display:none}
   .grid{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
-  .brandgrid{grid-template-columns:repeat(8,minmax(0,1fr))}
   /* two-row header: a thin utility strip above the logo/search row (Nike's top bar) */
   .utilbar{display:flex;order:-1;flex:0 0 100%;align-items:center;justify-content:space-between;gap:16px;padding:6px 0;font-size:.8rem;background:var(--surface);box-shadow:0 0 0 100vmax var(--surface);clip-path:inset(0 -100vmax)}
   .util-msg{color:var(--muted)}
@@ -436,3 +429,17 @@ h1{font-size:1.7rem} h2{font-size:1.3rem} h3{font-size:1.05rem}
 .sk-box{max-width:520px}
 #drops>div .sk-img{aspect-ratio:3/4}
 @media (prefers-reduced-motion:reduce){.sk{animation:none}}
+
+/* Seller ratings */
+.stars{white-space:nowrap;font-size:.85rem}.stars i{font-style:normal;color:#e0a526}.stars b{font-weight:700}
+.seller-tile{flex:0 0 168px;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:18px 12px;border:1px solid var(--line,rgba(128,128,128,.25));border-radius:10px;background:var(--card,transparent);color:inherit;cursor:pointer;font:inherit}
+.seller-tile .av{width:56px;height:56px;font-size:1.4rem;color:#fff}
+.seller-tile b{font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seller-tile:hover{border-color:var(--accent)}
+.sk-seller{flex:0 0 168px;height:148px;border-radius:10px}
+.ratebox{margin:10px 0;padding:12px;border:1px solid var(--line,rgba(128,128,128,.25));border-radius:10px;display:flex;flex-direction:column;gap:8px}
+.stars-row{font-size:1.5rem;letter-spacing:2px;color:#e0a526;line-height:1}.stars-row .off{opacity:.3}
+.star{background:none;border:0;padding:4px 2px;font-size:1.7rem;line-height:1;color:rgba(128,128,128,.45);cursor:pointer;min-width:40px;min-height:40px}
+.star.on{color:#e0a526}
+.ratebox textarea{resize:vertical;width:100%}
+.ratebtns{display:flex;gap:8px}

@@ -23,6 +23,7 @@ import { adminPaymentRoutes, paymentRoutes, paymentWebhookRoutes } from "./modul
 import { adminCommissionRoutes, adminFinanceRoutes, sellerFinanceRoutes } from "./modules/finance/routes.js";
 import { safetyRoutes, adminReportRoutes } from "./modules/safety/routes.js";
 import { chatRoutes } from "./modules/chat/routes.js";
+import { adminRatingRoutes, publicRatingRoutes, ratingRoutes } from "./modules/ratings/routes.js";
 import { addressRoutes, adminOrderRoutes, orderRoutes, sellerOrderRoutes } from "./modules/orders/routes.js";
 
 declare module "fastify" {
@@ -167,6 +168,9 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
     await v1.register(paymentWebhookRoutes, { prefix: "/payments/webhook" });
     await v1.register(adminPaymentRoutes, { prefix: "/admin/payments" });
     await v1.register(chatRoutes, { prefix: "/chat" });
+    await v1.register(ratingRoutes, { prefix: "/ratings" });
+    await v1.register(publicRatingRoutes, { prefix: "/catalogue/sellers" });
+    await v1.register(adminRatingRoutes, { prefix: "/admin/ratings" });
     await v1.register(safetyRoutes, { prefix: "/safety" });
     await v1.register(adminReportRoutes, { prefix: "/admin/reports" });
     await v1.register(buyerReturnRoutes);

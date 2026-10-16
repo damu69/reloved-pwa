@@ -138,7 +138,8 @@ function row(ic, l, v, attr, tog) { return '<button class="row" ' + attr + '><sp
 function head(title, back, right) { return '<div class="bar">' + (back ? '<button class="back" data-a="back" aria-label="Back"><span class="chev" style="transform:rotate(-135deg);margin-left:4px"></span></button>' : "") + "<h1>" + title + "</h1>" + (right || "") + "</div>"; }
 function sw(on) { return '<span class="toggle" role="switch" aria-checked="' + !!on + '"></span>'; }
 function sum(l, v, cls) { return '<div class="sum ' + (cls || "") + '"><span>' + l + "</span><span>" + v + "</span></div>"; }
-function loadingBox() { return '<div class="empty">Loading…</div>'; }
+function skCards(n) { var o = ""; for (var k = 0; k < n; k++) o += '<div><div class="sk sk-img"></div><div class="sk sk-line"></div><div class="sk sk-line s"></div></div>'; return o; }
+function loadingBox() { return '<div class="sk-box" role="status" aria-label="Loading"><div class="sk sk-img sk-wide"></div><div class="sk sk-line"></div><div class="sk sk-line s"></div><div class="sk sk-line"></div></div>'; }
 function failBox(msg, retry) { return '<div class="empty"><h2>Could not load</h2>' + esc(msg || "") + '<div style="margin-top:12px"><button class="btn sm" data-a="' + (retry || "reload") + '">Try again</button></div></div>'; }
 
 /* ============ state ============ */
@@ -326,7 +327,7 @@ function card(i) {
 function gridHTML() {
   var F = UI.feed;
   if (F.error && !F.items.length) return '<div class="empty" style="grid-column:1/-1"><h2>Could not load items</h2>' + esc(F.error) + '<div style="margin-top:12px"><button class="btn sm" data-a="feedretry">Try again</button></div></div>';
-  if (!F.items.length) return F.loading || !F.loaded ? '<div class="empty" style="grid-column:1/-1">Loading…</div>' :
+  if (!F.items.length) return F.loading || !F.loaded ? skCards(8) :
     '<div class="empty" style="grid-column:1/-1"><h2>No items found</h2>Try a different search, category or filter.</div>';
   return F.items.map(card).join("");
 }
@@ -411,7 +412,7 @@ function railWrap(title, id, inner) {
   return '<section class="sec"><div class="sec-h"><h2>' + esc(title) + '</h2><span class="rail-ctl"><button class="rnd" data-rail="prev" aria-label="Scroll left">' + ICON_PREV + '</button><button class="rnd" data-rail="next" aria-label="Scroll right">' + ICON_NEXT + '</button></span></div><div class="rail-track" ' + (id ? 'id="' + id + '"' : "") + ">" + inner + "</div></section>";
 }
 function dropsHTML() {
-  var F = UI.feed; if (!F.items.length) return '<div class="muted small" style="padding:8px 0">New listings will appear here.</div>';
+  var F = UI.feed; if (!F.loaded || F.loading && !F.items.length) return skCards(6); if (!F.items.length) return '<div class="muted small" style="padding:8px 0">New listings will appear here.</div>';
   return F.items.slice(0, 12).map(card).join("");
 }
 function catRailHTML() {

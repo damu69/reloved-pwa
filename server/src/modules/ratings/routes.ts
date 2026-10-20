@@ -116,6 +116,15 @@ export async function publicRatingRoutes(app: FastifyInstance): Promise<void> {
 export async function adminRatingRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
   app.addHook("preHandler", requirePermission("admin.reports.manage"));
+  // Newest ratings first, so an admin can find and remove abusive ones. status=removed shows the ones already taken out.
+  app.get("/", async (req) => {
+    const q = parse(z.object({ status: z.enum(["live", "removed"]).default("live"), limit: z.coerce.number().int().min(1).max(100).default(50) }), req.query);
+    const r = await app.db.query(
+      `select r.id, r.stars, r.comment, r.created_at, r.removed_at, r.removal_reason, r.seller_id, s.display_name as seller, u.full_name as buyer
+         from seller_ratings r join sellers s on s.id = r.seller_id join users u on u.id = r.buyer_id
+        where (r.removed_at is not null) = ($1 = 'removed') order by r.created_at desc, r.id limit $2`, [q.status, q.limit]);
+    return { items: r.rows.map((x) => ({ id: x.id, stars: x.stars, comment: x.comment, createdAt: x.created_at, sellerId: x.seller_id, sellerName: x.seller, buyerName: x.buyer, removedAt: x.removed_at, removalReason: x.removal_reason })) };
+  });
   app.post("/:id/remove", async (req) => {
     const { id } = parse(idParam, req.params);
     const b = parse(z.object({ reason: safeText(3, 300) }).strict(), req.body);

@@ -17,7 +17,7 @@ V.admin = function () {
   var sc = need("ad:cnt", function () { return Promise.all([api.get("/admin/sellers?status=submitted&limit=50").catch(function () { return { items: [] }; }), api.get("/admin/catalogue/products?status=pending&limit=50").catch(function () { return { items: [] }; }), api.get("/admin/catalogue/pending-changes?limit=50").catch(function () { return { items: [] }; })]).then(function (r) { return { sellers: r[0].items.length, products: r[1].items.length, changes: r[2].items.length }; }); });
   var n = sc.data || {}, dot = function (x) { return x ? '<span class="dot">' + x + "</span>" : ""; };
   return head("Admin", true) + '<h3 style="margin:6px 0">Needs review</h3><div class="list">' + row("S", "Seller applications", dot(n.sellers), 'data-a="go" data-i="adsellers"') + row("P", "Product reviews", dot(n.products + n.changes), 'data-a="go" data-i="adprods"') + "</div>" +
-    '<h3 style="margin:14px 0 6px">Marketplace</h3><div class="list">' + row("O", "Orders", "", 'data-a="go" data-i="adorders"') + row("U", "Users", "", 'data-a="go" data-i="adusers"') + row("!", "Reports", "", 'data-a="go" data-i="adreports"') + row("C", "Categories, brands, GST", "", 'data-a="go" data-i="adcat"') + row("%", "Coupons", "", 'data-a="go" data-i="adcoupons"') + "</div>" +
+    '<h3 style="margin:14px 0 6px">Marketplace</h3><div class="list">' + row("O", "Orders", "", 'data-a="go" data-i="adorders"') + row("U", "Users", "", 'data-a="go" data-i="adusers"') + row("!", "Reports", "", 'data-a="go" data-i="adreports"') + (can("admin.reports.manage") ? row("★", "Seller ratings", "", 'data-a="go" data-i="adratings"') : "") + row("C", "Categories, brands, GST", "", 'data-a="go" data-i="adcat"') + row("%", "Coupons", "", 'data-a="go" data-i="adcoupons"') + "</div>" +
     '<h3 style="margin:14px 0 6px">Money</h3><div class="list">' + row("%", "Commission", "", 'data-a="go" data-i="adcomm"') + row("₹", "Fees &amp; delivery", "", 'data-a="go" data-i="adfees"') + row("T", "Hold &amp; return rules", "", 'data-a="go" data-i="adrules"') + "</div>";
 };
 
@@ -275,6 +275,29 @@ V.adorder = function (id) {
   if (a.name) out += '<p class="muted small">Ship to: ' + esc(a.name) + ", " + esc(a.line1) + ", " + esc(a.city) + ", " + esc(a.state) + " " + esc(a.pincode) + "</p>";
   if (o.payments && o.payments.length) out += '<h3 style="margin:14px 0 6px">Payments</h3><div class="list">' + o.payments.map(function (p) { return '<div class="row"><span class="l">' + esc(p.provider) + " · " + esc(p.status) + '<br><span class="muted small">' + R.when(p.createdAt) + (p.failureReason ? " · " + esc(p.failureReason) : "") + '</span></span><span class="price">' + inr(p.amountPaise) + "</span></div>"; }).join("") + "</div>";
   return out + '<p class="muted small">Refunds and cancelling a paid order on a seller\'s behalf will come in the next step.</p>';
+};
+
+/* ---------- seller ratings ---------- */
+var rStatus = "live", rWhy = "";
+V.adratings = function () {
+  var g = guard(); if (g) return g;
+  var c = need("ad:ratings:" + rStatus, function () { return api.get("/admin/ratings?status=" + rStatus + "&limit=50"); });
+  var out = head("Seller ratings", true) + '<div class="chips" style="margin-bottom:10px"><button class="chip' + (rStatus === "live" ? " on" : "") + '" data-a="adrtab" data-i="live">Showing</button><button class="chip' + (rStatus === "removed" ? " on" : "") + '" data-a="adrtab" data-i="removed">Removed</button></div>';
+  return out + listBox(c, rStatus === "live" ? "No ratings yet." : "Nothing removed.", function (x) {
+    var open = R.UI.confirm === "rr" + x.id;
+    return '<div class="row" style="display:block"><b>' + "★".repeat(x.stars) + "</b> <span class=\"muted small\">for " + esc(x.sellerName) + " by " + esc(x.buyerName) + " · " + R.when(x.createdAt) + "</span>" +
+      (x.comment ? '<p style="margin:4px 0">' + esc(x.comment) + "</p>" : "") +
+      (x.removedAt ? '<p class="muted small" style="margin:4px 0">Removed: ' + esc(x.removalReason || "") + "</p>" :
+        open ? '<div class="two" style="margin-top:8px"><input class="inp" id="ad_rr" placeholder="Reason (min 3 characters)" maxlength="300" value="' + esc(rWhy) + '"><button class="btn danger sm" data-a="adrdel" data-i="' + esc(x.id) + '">Remove rating</button></div>' :
+        '<div style="margin-top:8px"><button class="btn ghost sm" data-a="adropen" data-i="' + esc(x.id) + '">Remove…</button></div>') + "</div>";
+  });
+};
+A.adrtab = function (s) { rStatus = s; R.UI.confirm = null; R.render(); };
+A.adropen = function (id) { R.UI.confirm = "rr" + id; rWhy = ""; R.render(); };
+A.adrdel = async function (id) {
+  var why = val("ad_rr").trim(); rWhy = why;
+  if (why.length < 3) return toast("Write a reason (at least 3 characters).");
+  try { await api.post("/admin/ratings/" + id + "/remove", { reason: why }); R.UI.confirm = null; drop("ad:ratings"); drop("sr:"); R.drop("ratings:"); toast("Rating removed"); R.render(); } catch (e) { toast(errText(e)); }
 };
 
 /* ---------- users ---------- */

@@ -443,3 +443,12 @@ h1{font-size:1.7rem} h2{font-size:1.3rem} h3{font-size:1.05rem}
 .star.on{color:#e0a526}
 .ratebox textarea{resize:vertical;width:100%}
 .ratebtns{display:flex;gap:8px}
+.reviews{margin:0 0 14px;padding:14px;border:1px solid var(--line,rgba(128,128,128,.25));border-radius:10px}
+.rv-top{display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+.rv-score{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:90px}.rv-score b{font-size:2.2rem;line-height:1;font-weight:700}
+.rv-score .stars-row{font-size:1.1rem}
+.rv-bars{flex:1;min-width:180px;display:flex;flex-direction:column;gap:4px}
+.rv-bar{display:grid;grid-template-columns:28px 1fr 28px;gap:8px;align-items:center;font-size:.8rem}
+.rv-bar i{height:6px;border-radius:3px;background:rgba(128,128,128,.25);overflow:hidden;display:block}.rv-bar u{display:block;height:100%;background:#e0a526;text-decoration:none}
+.rv-list{margin-top:10px}.rv-list summary{cursor:pointer;font-weight:600;padding:6px 0}
+.rv-item{padding:8px 0;border-top:1px solid var(--line,rgba(128,128,128,.2))}.rv-item p{margin:4px 0 0}

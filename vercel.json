@@ -1,16 +1,67 @@
 {
   "functions": {
-    "api/page.js": { "includeFiles": "index.html" }
+    "api/page.js": {
+      "includeFiles": "index.html"
+    }
   },
   "redirects": [
-    { "source": "/server/:path*", "destination": "/", "permanent": false }
+    {
+      "source": "/server/:path*",
+      "destination": "/",
+      "permanent": false
+    }
   ],
   "rewrites": [
-    { "source": "/item/:id/:slug?", "destination": "/api/page?kind=item&id=:id" },
-    { "source": "/c/:path*", "destination": "/api/page?kind=c&path=:path*" },
-    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
-    { "source": "/api/:path((?!page$|sitemap$).*)", "destination": "https://reloved-pwa-xumb.vercel.app/api/:path" },
-    { "source": "/:first(search|seller|home|discover|sell|inbox|cart|profile)/:rest*", "destination": "/index.html" },
-    { "source": "/:first(search|seller|home|discover|sell|inbox|cart|profile)", "destination": "/index.html" }
+    {
+      "source": "/item/:id/:slug?",
+      "destination": "/api/page?kind=item&id=:id"
+    },
+    {
+      "source": "/c/:path*",
+      "destination": "/api/page?kind=c&path=:path*"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
+      "source": "/api/:path((?!page$|sitemap$).*)",
+      "destination": "https://reloved-pwa-xumb.vercel.app/api/:path"
+    },
+    {
+      "source": "/:first(search|seller|home|discover|sell|inbox|cart|profile)/:rest*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/:first(search|seller|home|discover|sell|inbox|cart|profile)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/((?!api/).*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(self), microphone=(), geolocation=(), payment=(self)"
+        }
+      ]
+    }
   ]
 }

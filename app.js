@@ -54,7 +54,7 @@ function ph(title, pid, imgId, size, extra, cat, alt) {
   size = size || 600;
   var srcset = IMG_SIZES[size] ? ' srcset="' + [200, 600, 1200].filter(function (s) { return s <= size; }).map(function (s) { return esc(api.media(pid, imgId, s)) + " " + s + "w"; }).join(", ") + '" sizes="' + IMG_SIZES[size] + '"' : "";
   return '<div class="ph" style="' + bg + '">' + art +
-    (imgId ? '<img loading="lazy" decoding="async" alt="' + esc(alt || "") + '" src="' + esc(api.media(pid, imgId, size)) + '"' + srcset + ' onerror="this.remove()">' : "") + (extra || "") + "</div>";
+    (imgId ? '<img loading="lazy" decoding="async" alt="' + esc(alt || "") + '" src="' + esc(api.media(pid, imgId, size)) + '"' + srcset + ' data-rm="1">' : "") + (extra || "") + "</div>";
 }
 // Alt text for a product photo: "Maroon silk saree, Biba, Good".
 function photoAlt(title, brand, cond) { return [title, brand, COND[cond] || cond].filter(Boolean).join(", "); }
@@ -992,6 +992,8 @@ function start() {
   else if (c.v !== "home") enter(c.v, c.p);
   render();
 }
+// A photo that fails to load is removed so the colour placeholder shows. Done here, not with an inline onerror attribute, because the site's Content-Security-Policy forbids inline handlers.
+document.addEventListener("error", function (ev) { var t = ev.target; if (t && t.tagName === "IMG" && t.hasAttribute("data-rm")) t.remove(); }, true);
 window.RL = { V: V, A: {}, E: {}, PCAT: PCAT, paintNav: renderNav, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
   current: function () { return cur(); }, canBack: function () { return stack.length > 0; }, replace: replace, itemUrl: itemUrl };
 boot();

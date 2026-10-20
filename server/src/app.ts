@@ -116,10 +116,18 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
       return reply.code(400).send({ error: { code: "VALIDATION_FAILED", message: "Some values are invalid.", requestId } });
     }
     req.log.error({ err }, "unhandled error");
+    // TEMPORARY DIAGNOSTIC (remove after the 500 investigation): shows what kind of error it was, never a stack or a secret.
+    reply.header("x-debug-error", (String(err?.code ?? err?.name ?? "error") + ": " + String(err?.message ?? "")).replace(/[^\x20-\x7e]/g, " ").slice(0, 120));
     return reply.code(500).send({ error: { code: "INTERNAL", message: "Something went wrong on our side. Please try again.", requestId } });
   });
 
   app.get("/health", { config: { rateLimit: false } }, async () => ({ status: "ok" }));
+  // TEMPORARY DIAGNOSTIC (remove after the rate-limit investigation): tells the caller which address the API sees for them.
+  app.get("/debug/client-ip", { config: { rateLimit: false } }, async (req) => ({
+    ip: req.ip, socket: req.socket.remoteAddress,
+    xForwardedFor: req.headers["x-forwarded-for"] ?? null, xRealIp: req.headers["x-real-ip"] ?? null, xVercelForwardedFor: req.headers["x-vercel-forwarded-for"] ?? null,
+    trustProxyHops: cfg.TRUST_PROXY_HOPS, poolMax: cfg.DATABASE_POOL_MAX,
+  }));
 
   // Background housekeeping for serverless hosting, called every minute by a scheduler
   // (Supabase pg_cron). Only exists when CRON_SECRET is set; the secret is compared in constant time.

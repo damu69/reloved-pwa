@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import helmet from "@fastify/helmet";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
@@ -123,11 +123,13 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
 
   app.get("/health", { config: { rateLimit: false } }, async () => ({ status: "ok" }));
   // TEMPORARY DIAGNOSTIC (remove after the rate-limit investigation): tells the caller which address the API sees for them.
-  app.get("/debug/client-ip", { config: { rateLimit: false } }, async (req) => ({
+  const debugClientIp = async (req: FastifyRequest) => ({
     ip: req.ip, socket: req.socket.remoteAddress,
     xForwardedFor: req.headers["x-forwarded-for"] ?? null, xRealIp: req.headers["x-real-ip"] ?? null, xVercelForwardedFor: req.headers["x-vercel-forwarded-for"] ?? null,
     trustProxyHops: cfg.TRUST_PROXY_HOPS, poolMax: cfg.DATABASE_POOL_MAX,
-  }));
+  });
+  app.get("/debug/client-ip", { config: { rateLimit: false } }, debugClientIp);
+  app.get("/api/v1/debug/client-ip", { config: { rateLimit: false } }, debugClientIp);
 
   // Background housekeeping for serverless hosting, called every minute by a scheduler
   // (Supabase pg_cron). Only exists when CRON_SECRET is set; the secret is compared in constant time.

@@ -287,7 +287,7 @@ function loadScript(src, attrs) {
 // admin.js uses helpers from seller.js (RL.H), so seller.js always runs first.
 var MODS = { seller: ["/seller.js"], admin: ["/seller.js", "/admin.js"] }, MOD_OF = {}, modState = {}; // modState: name -> "loading" | "ok" | "err"
 "sell slbank slearn slform slorder slorders slprod slprods".split(" ").forEach(function (v) { MOD_OF[v] = "seller"; });
-"admin adcat adcomm adcoupons adfees adorder adorders adprod adprods adrules adseller adsellers adusers".split(" ").forEach(function (v) { MOD_OF[v] = "admin"; });
+"admin adcat adcomm adcoupons adfees adorder adorders adprod adprods adrules adratings adseller adsellers adusers".split(" ").forEach(function (v) { MOD_OF[v] = "admin"; });
 function loadMod(name) {
   if (modState[name]) return; // already loaded, loading, or failed (the "Try again" button clears a failure)
   modState[name] = "loading";
@@ -368,7 +368,7 @@ function toolbarHTML() {
     '<div class="toolbar"><div class="tb-l"><h2 class="listtitle">' + esc(listTitle()) + '</h2><span class="count" id="count" aria-live="polite">' + countText() + "</span>" +
     (UI.sellerId ? '<button class="chip" data-a="clearseller">Show all</button>' : "") + "</div>" +
     '<span class="tb-r"><button class="linkbtn hidefil" data-a="hidefil">' + (UI.hidefil ? "Show filters" : "Hide filters") + '</button>' + '<label class="sortsel"><span>Sort</span><select class="inp" id="fs" data-f="1">' + opt("", UI.q.trim() ? "Best match" : "Newest", UI.sort) + opt("price_asc", "Price: low to high", UI.sort) + opt("price_desc", "Price: high to low", UI.sort) + "</select></label></span></div>" +
-    '<div class="actives" id="actives">' + activesHTML() + "</div>";
+    '<div class="actives" id="actives">' + activesHTML() + "</div>" + sellerReviewsHTML();
 }
 // The filters in use, each removable with one tap, plus "Clear all" (Vinted shows these under its filter row).
 function brandName(slug) { var b = (S.brands || []).filter(function (x) { return x.slug === slug; })[0]; return b ? b.name : slug; }
@@ -420,6 +420,16 @@ function sellersRailHTML() {
   return railWrap("Top rated sellers", "", L.map(function (x) {
     return '<button class="seller-tile" data-a="seller" data-i="' + esc(x.id) + '" data-j="' + esc(x.displayName) + '"><span class="av" style="background:hsl(' + hueOf(x.displayName) + ',40%,32%)">' + esc(String(x.displayName).slice(0, 1).toUpperCase()) + '</span><b>' + esc(x.displayName) + "</b>" + starsText(x.ratingAvg, x.ratingCount) + '<span class="muted small">' + x.itemCount + (x.itemCount === 1 ? " item" : " items") + "</span></button>";
   }).join(""));
+}
+function sellerReviewsHTML() {
+  if (!UI.sellerId) return "";
+  var id = UI.sellerId, c = need("sr:" + id, function () { return api.get("/catalogue/sellers/" + id + "/ratings", { anon: true }); });
+  if (c.st === "loading") return '<section class="reviews"><div class="sk" style="height:84px"></div></section>';
+  if (c.st === "err" || !c.data.ratingCount) return "";
+  var d = c.data, max = Math.max.apply(null, d.distribution.map(function (x) { return x.count; })) || 1;
+  return '<section class="reviews"><div class="rv-top"><div class="rv-score"><b>' + Number(d.ratingAvg).toFixed(1) + '</b><span class="stars-row" aria-hidden="true">' + "★".repeat(Math.round(d.ratingAvg)) + '<span class="off">' + "★".repeat(5 - Math.round(d.ratingAvg)) + '</span></span><span class="muted small">' + d.ratingCount + (d.ratingCount === 1 ? " rating" : " ratings") + '</span></div><div class="rv-bars">' +
+    d.distribution.map(function (x) { return '<div class="rv-bar"><span>' + x.stars + '★</span><i><u style="width:' + Math.round(x.count / max * 100) + '%"></u></i><span class="muted">' + x.count + "</span></div>"; }).join("") + "</div></div>" +
+    (d.recent.some(function (x) { return x.comment; }) ? '<details class="rv-list"' + (d.recent.length <= 3 ? " open" : "") + "><summary>Buyer comments</summary>" + d.recent.filter(function (x) { return x.comment; }).map(function (x) { return '<div class="rv-item"><span class="stars"><i aria-hidden="true">' + "★".repeat(x.stars) + '</i></span> <b>' + esc(x.buyerName) + '</b> <span class="muted small">· ' + when(x.createdAt) + '</span><p>' + esc(x.comment) + "</p></div>"; }).join("") + "</details>" : "") + "</section>";
 }
 function dropsHTML() {
   var F = UI.feed; if (!F.loaded || F.loading && !F.items.length) return skCards(6); if (!F.items.length) return '<div class="muted small" style="padding:8px 0">New listings will appear here.</div>';

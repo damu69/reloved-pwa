@@ -156,9 +156,16 @@ describe("removing abusive ratings", () => {
   it("is admin-only, drops the rating from the average, keeps the row, and cannot be re-rated", async () => {
     const row = (await t.pool.query(`select id, seller_order_id, buyer_id from seller_ratings where seller_id = $1 and stars = 3`, [aS])).rows[0];
     expect((await call(ben, "POST", `/admin/ratings/${row.id}/remove`, { reason: "Abusive" })).statusCode).toBe(403);
+    expect((await call(ben, "GET", "/admin/ratings")).statusCode).toBe(403);
+    const live = (await call(admin, "GET", "/admin/ratings")).json().items;
+    expect(live.some((x: any) => x.id === row.id && x.sellerName && x.buyerName)).toBe(true);
+    expect((await call(admin, "GET", "/admin/ratings?status=bogus")).statusCode).toBe(400);
     expect((await call(admin, "POST", `/admin/ratings/${row.id}/remove`, { reason: "x" })).statusCode).toBe(400);
     expect((await call(admin, "POST", `/admin/ratings/${row.id}/remove`, { reason: "Abusive language" })).statusCode).toBe(200);
     expect((await call(admin, "POST", `/admin/ratings/${row.id}/remove`, { reason: "Abusive language" })).statusCode).toBe(200); // repeat is harmless
+    const gone = (await call(admin, "GET", "/admin/ratings?status=removed")).json().items;
+    expect(gone.some((x: any) => x.id === row.id && x.removalReason === "Abusive language")).toBe(true);
+    expect((await call(admin, "GET", "/admin/ratings")).json().items.some((x: any) => x.id === row.id)).toBe(false);
     const j = (await call(null, "GET", `/catalogue/sellers/${aS}/ratings`)).json();
     expect(j.ratingCount).toBe(3);
     expect(j.ratingAvg).toBe(4.7);

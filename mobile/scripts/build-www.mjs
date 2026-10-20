@@ -5,7 +5,7 @@ import path from "node:path";
 // In the repository the website sits at the repo root (this folder is ../mobile); locally it may be ../web.
 const src = fs.existsSync(path.resolve("..", "index.html")) ? path.resolve("..") : path.resolve("..", "web"), dst = path.resolve("www");
 // Only the files the app uses (the repo root also holds server/, mobile/, sql files and so on).
-const files = ["index.html", "config.js", "api.js", "app.js", "seller.js", "admin.js", "swipe.js", "safety.js", "styles.css",
+const files = ["index.html", "config.js", "api.js", "app.js", "seller.js", "admin.js", "swipe.js", "safety.js", "showcase.js", "theme.js", "styles.css",
   "privacy.html", "terms.html", "delete-account.html", "icon-192.png", "icon-512.png"];
 fs.rmSync(dst, { recursive: true, force: true });
 fs.mkdirSync(dst, { recursive: true });

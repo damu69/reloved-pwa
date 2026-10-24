@@ -1,0 +1,9 @@
+node_modules/
+.stack/
+reports/
+e2e/results/
+e2e/test-results/
+e2e/playwright-report/
+.env
+.env.*
+!.env.example

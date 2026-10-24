@@ -1,0 +1,17 @@
+{
+  "name": "reloved-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Browser end-to-end tests for the Reloved PWA (Playwright). See ci/jenkins/README.md.",
+  "scripts": {
+    "start:web": "node web.mjs",
+    "seed": "node seed.mjs",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

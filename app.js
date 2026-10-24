@@ -930,17 +930,17 @@ window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault()
 
 async function submitAuth() {
   var A = UI.auth; if (A.busy) return;
-  var email = val("ae"), pw = $("ap").value, reg = A.mode === "register";
+  // Read every field before render(): rendering rebuilds the form and would empty the name and phone boxes.
+  var email = val("ae"), pw = $("ap").value, reg = A.mode === "register", name = val("an"), phone = val("aph");
   if (!email || !pw) { A.err = "Enter your email and password."; render(); return; }
   A.busy = true; A.err = ""; render();
   try {
-    if (reg) await api.register({ email: email, password: pw, fullName: val("an") || email.split("@")[0], phone: val("aph") || undefined });
+    if (reg) await api.register({ email: email, password: pw, fullName: name || email.split("@")[0], phone: phone || undefined });
     else await api.login(email, pw);
     await loadMe(); A.busy = false; afterAuth(); toast(reg ? "Welcome to Reloved" : "Signed in");
   } catch (e) {
-    var keepName = val("an"), keepPhone = val("aph");
     A.busy = false; A.err = e.code === "ACCOUNT_EXISTS" ? "An account with this email already exists. Try signing in." : errText(e);
-    render(); var em = $("ae"); if (em) em.value = email; var en = $("an"); if (en) en.value = keepName; var ep = $("aph"); if (ep) ep.value = keepPhone;
+    render(); var em = $("ae"); if (em) em.value = email; var en = $("an"); if (en) en.value = name; var ep = $("aph"); if (ep) ep.value = phone;
   }
 }
 

@@ -6,6 +6,8 @@ import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { runSweep } from "./lib/sweep.js";
+import { createRateLimitStore, createRestCounter } from "./lib/ratelimit-store.js";
+import { setLimiterBackend } from "./lib/limiter.js";
 import type { Config } from "./lib/config.js";
 import type { Db } from "./lib/db.js";
 import { AppError } from "./lib/errors.js";
@@ -71,8 +73,12 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
   await app.register(cookie);
   // Only the document upload route reads multipart; limits are tightened again there.
   await app.register(multipart, { limits: { fileSize: 8 * 1024 * 1024, files: 1, fields: 0, parts: 2, headerPairs: 50 } });
-  // In-memory limits are per instance. TODO before running several instances: Redis store.
+  // Shared counters when UPSTASH_REDIS_REST_URL/_TOKEN are set (all serverless instances see the same count);
+  // otherwise in-memory limits, per instance. Redis outages fall back to memory instead of blocking traffic.
+  const counter = createRestCounter(cfg);
+  setLimiterBackend(counter);
   await app.register(rateLimit, {
+    ...(counter ? { store: createRateLimitStore(counter, (m) => app.log.warn(m)) as never } : {}),
     global: true,
     max: 300,
     timeWindow: "1 minute",
@@ -116,20 +122,23 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
       return reply.code(400).send({ error: { code: "VALIDATION_FAILED", message: "Some values are invalid.", requestId } });
     }
     req.log.error({ err }, "unhandled error");
-    // TEMPORARY DIAGNOSTIC (remove after the 500 investigation): shows what kind of error it was, never a stack or a secret.
-    reply.header("x-debug-error", (String(err?.code ?? err?.name ?? "error") + ": " + String(err?.message ?? "")).replace(/[^\x20-\x7e]/g, " ").slice(0, 120));
+    // Diagnostic header: off unless DEBUG_DIAGNOSTICS=true (it echoes the error message to the caller). Never enable it in production.
+    if (cfg.DEBUG_DIAGNOSTICS === "true") reply.header("x-debug-error", (String(err?.code ?? err?.name ?? "error") + ": " + String(err?.message ?? "")).replace(/[^\x20-\x7e]/g, " ").slice(0, 120));
     return reply.code(500).send({ error: { code: "INTERNAL", message: "Something went wrong on our side. Please try again.", requestId } });
   });
 
   app.get("/health", { config: { rateLimit: false } }, async () => ({ status: "ok" }));
-  // TEMPORARY DIAGNOSTIC (remove after the rate-limit investigation): tells the caller which address the API sees for them.
+  // Diagnostic (see DEBUG_DIAGNOSTICS): tells the caller which address the API sees for them.
   const debugClientIp = async (req: FastifyRequest) => ({
     ip: req.ip, socket: req.socket.remoteAddress,
     xForwardedFor: req.headers["x-forwarded-for"] ?? null, xRealIp: req.headers["x-real-ip"] ?? null, xVercelForwardedFor: req.headers["x-vercel-forwarded-for"] ?? null,
     trustProxyHops: cfg.TRUST_PROXY_HOPS, poolMax: cfg.DATABASE_POOL_MAX,
   });
-  app.get("/debug/client-ip", { config: { rateLimit: false } }, debugClientIp);
-  app.get("/api/v1/debug/client-ip", { config: { rateLimit: false } }, debugClientIp);
+  // Off unless DEBUG_DIAGNOSTICS=true: it reveals the caller's address and proxy headers to anyone.
+  if (cfg.DEBUG_DIAGNOSTICS === "true") {
+    app.get("/debug/client-ip", { config: { rateLimit: false } }, debugClientIp);
+    app.get("/api/v1/debug/client-ip", { config: { rateLimit: false } }, debugClientIp);
+  }
 
   // Background housekeeping for serverless hosting, called every minute by a scheduler
   // (Supabase pg_cron). Only exists when CRON_SECRET is set; the secret is compared in constant time.

@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "migrate": "tsx src/scripts/migrate.ts",
     "grant-admin": "tsx src/scripts/grant-admin.ts",
+    "rotate-key": "tsx src/scripts/rotate-encryption-key.ts",
     "test": "vitest run",
     "vercel-build": "node scripts/vercel-build.mjs"
   },

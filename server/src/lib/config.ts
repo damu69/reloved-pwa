@@ -48,6 +48,11 @@ const schema = z.object({
   EMAIL_FROM: z.string().min(5).optional(),
   APP_URL: z.string().url().default("http://localhost:5173"),
   DEV_EXPOSE_RESET_TOKEN: z.enum(["true", "false"]).default("false"),
+  // Turns on /debug/client-ip and the x-debug-error response header. For short investigations only; refused in production.
+  // Optional shared rate-limit counters (Upstash Redis REST). Set both or neither. Unset = per-instance memory limits.
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(10).optional(),
+  DEBUG_DIAGNOSTICS: z.enum(["true", "false"]).default("false"),
   // Payment provider. none (default): checkout works but orders cannot be paid (they expire).
   // mock: a fake provider for development and tests, only when set explicitly; refused in production,
   // because anyone signed in could mark their own orders paid. Razorpay arrives later.
@@ -67,6 +72,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const c = parsed.data;
   if (c.NODE_ENV === "production") {
     if (c.DEV_EXPOSE_RESET_TOKEN === "true") throw new Error("DEV_EXPOSE_RESET_TOKEN must be false in production");
+    if (c.DEBUG_DIAGNOSTICS === "true") throw new Error("DEBUG_DIAGNOSTICS must be false in production");
     if (c.COOKIE_SECURE !== "true") throw new Error("COOKIE_SECURE must be true in production");
     if (/change[-_]?me|example|secret123/i.test(c.JWT_SECRET)) throw new Error("JWT_SECRET looks like a placeholder");
     if (c.DATABASE_SSL === "off") throw new Error("DATABASE_SSL must be require or verify-full in production");
@@ -77,6 +83,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   if (c.STORAGE_DRIVER === "supabase" && (!c.SUPABASE_URL || !c.SUPABASE_SERVICE_ROLE_KEY)) {
     throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required when STORAGE_DRIVER=supabase");
+  }
+  if (Boolean(c.UPSTASH_REDIS_REST_URL) !== Boolean(c.UPSTASH_REDIS_REST_TOKEN)) {
+    throw new Error("UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set together");
   }
   let MOCK_PAYMENT_SECRET = c.MOCK_PAYMENT_SECRET ?? "";
   if (c.PAYMENT_PROVIDER === "mock" && !MOCK_PAYMENT_SECRET) {

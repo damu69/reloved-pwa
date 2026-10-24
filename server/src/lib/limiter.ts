@@ -1,28 +1,30 @@
 import type { FastifyRequest } from "fastify";
 import { AppError } from "./errors.js";
+import { MemoryWindows, type WindowCounter } from "./ratelimit-store.js";
 
-// Fixed-window counter used for a second limit on a route (the rate-limit plugin runs only one
-// limiter per request). In memory, per instance. TODO before running several API instances:
-// move both limiters to Redis so counts are shared.
+// Second limit on a route (the rate-limit plugin runs only one limiter per request).
+// Counts live in Redis when a backend is configured (shared by every serverless instance); otherwise,
+// and whenever Redis is unreachable, in memory per instance.
+let backend: WindowCounter | null = null;
+export function setLimiterBackend(b: WindowCounter | null): void {
+  backend = b;
+}
+
 export function windowLimiter(name: string, max: number, windowMs: number, key: (req: FastifyRequest) => string) {
-  const hits = new Map<string, { n: number; resetAt: number }>();
-  let lastSweep = Date.now();
+  const mem = new MemoryWindows();
   return async (req: FastifyRequest): Promise<void> => {
-    const now = Date.now();
-    if (now - lastSweep > windowMs) {
-      for (const [k, v] of hits) if (v.resetAt <= now) hits.delete(k);
-      lastSweep = now;
+    const k = `rl:${name}|${key(req)}`;
+    let r: { count: number; ttlMs: number } | null = null;
+    if (backend) {
+      try {
+        r = await backend.hit(k, windowMs);
+      } catch (e) {
+        req.log.warn({ err: (e as Error)?.message }, "rate-limit store unavailable, using memory");
+      }
     }
-    const k = `${name}|${key(req)}`;
-    let e = hits.get(k);
-    if (!e || e.resetAt <= now) {
-      e = { n: 0, resetAt: now + windowMs };
-      hits.set(k, e);
-    }
-    e.n += 1;
-    if (e.n > max) {
-      const secs = Math.ceil((e.resetAt - now) / 1000);
-      throw new AppError(429, "RATE_LIMITED", `Too many requests. Try again in ${secs} seconds.`);
+    if (!r) r = mem.hit(k, windowMs);
+    if (r.count > max) {
+      throw new AppError(429, "RATE_LIMITED", `Too many requests. Try again in ${Math.ceil(r.ttlMs / 1000)} seconds.`);
     }
   };
 }

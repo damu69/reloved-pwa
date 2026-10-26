@@ -1,0 +1,2 @@
+# Reviewed false positive: Supabase public "anon" key (role=anon, meant to be public) in an old config.js, removed when the app moved to its own API.
+805119591469515377de891c8e06ab0200f76e10:config.js:jwt:4

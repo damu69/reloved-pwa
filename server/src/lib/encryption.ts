@@ -14,7 +14,7 @@ export function createFieldCipher(cfg: Config): FieldCipher {
   return {
     encrypt(plain, aad) {
       const iv = randomBytes(12);
-      const c = createCipheriv("aes-256-gcm", key, iv);
+      const c = createCipheriv("aes-256-gcm", key, iv, { authTagLength: 16 });
       c.setAAD(Buffer.from(aad));
       const ct = Buffer.concat([c.update(plain, "utf8"), c.final()]);
       return "v1:" + Buffer.concat([iv, c.getAuthTag(), ct]).toString("base64");
@@ -22,7 +22,7 @@ export function createFieldCipher(cfg: Config): FieldCipher {
     decrypt(token, aad) {
       if (!token.startsWith("v1:")) throw new Error("Unknown ciphertext version");
       const raw = Buffer.from(token.slice(3), "base64");
-      const d = createDecipheriv("aes-256-gcm", key, raw.subarray(0, 12));
+      const d = createDecipheriv("aes-256-gcm", key, raw.subarray(0, 12), { authTagLength: 16 });
       d.setAAD(Buffer.from(aad));
       d.setAuthTag(raw.subarray(12, 28));
       return Buffer.concat([d.update(raw.subarray(28)), d.final()]).toString("utf8");

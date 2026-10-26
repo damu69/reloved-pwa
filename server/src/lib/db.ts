@@ -8,9 +8,10 @@ export type Queryable = pg.Pool | pg.PoolClient;
 export function createPool(cfg: Config): pg.Pool {
   const pool = new pg.Pool({
     connectionString: cfg.DATABASE_URL,
+    // "require" = encrypt but do not verify the server certificate: an explicit opt-in; the default verifies.
     ssl:
       cfg.DATABASE_SSL === "off" ? undefined
-      : cfg.DATABASE_SSL === "require" ? { rejectUnauthorized: false }
+      : cfg.DATABASE_SSL === "require" ? { rejectUnauthorized: false } // nosemgrep: problem-based-packs.insecure-transport.js-node.bypass-tls-verification.bypass-tls-verification
       : { rejectUnauthorized: true, ...(cfg.DATABASE_CA_CERT ? { ca: cfg.DATABASE_CA_CERT } : {}) },
     max: cfg.DATABASE_POOL_MAX,
     idleTimeoutMillis: 30_000,

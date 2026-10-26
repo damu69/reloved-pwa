@@ -65,11 +65,15 @@ pipeline {
     }
     stage('Web scan (OWASP ZAP baseline)') {
       steps {
-        sh 'mkdir -p reports; docker rm -f zap >/dev/null 2>&1 || true'
+        sh 'mkdir -p reports; docker rm -f zap >/dev/null 2>&1 || true; docker volume rm -f zapwrk >/dev/null 2>&1 || true; docker volume create zapwrk'
+        // ZAP only writes its report into a mounted folder, so use a named volume and copy the report out afterwards.
         // -I: report warnings without failing the build (tighten later once the baseline is clean)
-        sh 'docker run --name zap --network container:jenkins ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t http://localhost:5173 -r zap.html -I'
-        sh 'docker cp zap:/zap/wrk/zap.html reports/zap.html'
-        sh 'docker rm -f zap || true'
+        sh 'docker run --name zap -u root -v zapwrk:/zap/wrk --network container:jenkins ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t http://localhost:5173 -r zap.html -w zap.md -I'
+      }
+      post {
+        always {
+          sh 'docker cp zap:/zap/wrk/zap.html reports/zap.html || true; docker cp zap:/zap/wrk/zap.md reports/zap.md || true; docker rm -f zap || true; docker volume rm -f zapwrk || true'
+        }
       }
     }
   }

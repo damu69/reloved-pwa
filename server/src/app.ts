@@ -12,6 +12,7 @@ import type { Config } from "./lib/config.js";
 import type { Db } from "./lib/db.js";
 import { AppError } from "./lib/errors.js";
 import { authRoutes, meRoutes } from "./modules/auth/routes.js";
+import { socialRoutes } from "./modules/auth/social-routes.js";
 import { adminRoutes } from "./modules/admin/routes.js";
 import { adminSellerRoutes, sellerRoutes } from "./modules/sellers/routes.js";
 import { adminCatalogueRoutes, publicCatalogueRoutes, sellerCatalogueRoutes } from "./modules/catalogue/routes.js";
@@ -163,6 +164,7 @@ export async function buildApp(cfg: Config, db: Db, overrides: { storage?: Stora
 
   await app.register(async (v1) => {
     await v1.register(authRoutes, { prefix: "/auth" });
+    await v1.register(socialRoutes, { prefix: "/auth/social" });
     await v1.register(meRoutes, { prefix: "/me" });
     await v1.register(adminRoutes, { prefix: "/admin" });
     await v1.register(sellerRoutes, { prefix: "/seller" });

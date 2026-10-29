@@ -6,7 +6,7 @@ import { migrate } from "../src/lib/migrator.js";
 import type { FastifyInstance } from "fastify";
 
 // Each test file gets a fresh database, created from TEST_DATABASE_URL's server.
-export async function setup(): Promise<{ app: FastifyInstance; pool: pg.Pool; cfg: Config; close: () => Promise<void> }> {
+export async function setup(extraEnv: Record<string, string> = {}): Promise<{ app: FastifyInstance; pool: pg.Pool; cfg: Config; close: () => Promise<void> }> {
   const base = process.env.TEST_DATABASE_URL ?? "postgres://postgres@localhost:5432/postgres";
   const name = `reloved_test_${process.pid}_${Math.random().toString(36).slice(2, 8)}`;
   const admin = new pg.Client({ connectionString: base });
@@ -27,6 +27,7 @@ export async function setup(): Promise<{ app: FastifyInstance; pool: pg.Pool; cf
     STORAGE_DRIVER: "local",
     STORAGE_LOCAL_DIR: `/tmp/reloved-test-storage/${name}`,
     PAYMENT_PROVIDER: "mock",
+    ...extraEnv,
   } as any);
   const pool = new pg.Pool({ connectionString: cfg.DATABASE_URL, max: 20 });
   pool.on("error", () => {}); // connections are force-closed when the test database is dropped

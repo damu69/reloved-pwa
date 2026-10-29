@@ -573,6 +573,7 @@ V.auth = function () {
     '<label class="field"><span>Password' + (reg ? " (at least 10 characters)" : "") + '</span><input class="inp" id="ap" type="password" autocomplete="' + (reg ? "new-password" : "current-password") + '"></label>' +
     (reg ? '<label class="field"><span>Phone (optional)</span><input class="inp" id="aph" inputmode="tel" autocomplete="tel"></label>' : "") +
     '<p class="bad small" id="aerr">' + esc(A.err) + '</p><button class="btn block" type="submit"' + (A.busy ? " disabled" : "") + ">" + (A.busy ? "Please wait…" : reg ? "Create account" : "Sign in") + "</button></form>" +
+    (window.RL && RL.socialButtons ? RL.socialButtons() : "") +
     '<div class="two"><button class="btn ghost" data-a="authmode" data-i="' + (reg ? "login" : "register") + '">' + (reg ? "I have an account" : "Create account") + "</button></div>" +
     (reg ? "" : '<p style="margin-top:12px"><button class="small" style="color:var(--accent);text-decoration:underline" data-a="go" data-i="forgot">Forgot your password?</button></p>') + "</div>";
 };
@@ -678,7 +679,8 @@ V.settings = function () {
   if (!signedIn()) return V.gate("Settings", "Sign in to change your settings.");
   var u = S.user;
   return head("Settings", true) + '<label class="field"><span>Full name</span><input class="inp" id="setn" maxlength="80" value="' + esc(u.fullName || "") + '"></label><button class="btn block" data-a="savename">Save name</button>' +
-    '<h3 style="margin:18px 0 6px">Change password</h3><label class="field"><span>Current password</span><input class="inp" id="pw0" type="password" autocomplete="current-password"></label><label class="field"><span>New password (at least 10 characters)</span><input class="inp" id="pw1" type="password" autocomplete="new-password"></label><button class="btn ghost block" data-a="savepw">Change password</button>' +
+    (window.RL && RL.socialSettings ? RL.socialSettings() : "") +
+    (u.hasPassword === false ? "" : '<h3 style="margin:18px 0 6px">Change password</h3><label class="field"><span>Current password</span><input class="inp" id="pw0" type="password" autocomplete="current-password"></label><label class="field"><span>New password (at least 10 characters)</span><input class="inp" id="pw1" type="password" autocomplete="new-password"></label><button class="btn ghost block" data-a="savepw">Change password</button>') +
     '<div class="list" style="margin-top:18px">' + row("T", "Light / dark theme", "", 'data-a="theme"') + row("+", "Install app", "", 'data-a="install"') + row("O", "Sign out", "", 'data-a="signout"') + row("X", "Sign out everywhere", "", 'data-a="signoutall"') + "</div>" +
     '<div class="list" style="margin-top:14px">' + row("B", "Blocked users", "", 'data-a="go" data-i="blocked"') + row("!", "Delete my account", "", 'data-a="go" data-i="delacct"') + "</div>";
 };
@@ -994,7 +996,7 @@ function start() {
 }
 // A photo that fails to load is removed so the colour placeholder shows. Done here, not with an inline onerror attribute, because the site's Content-Security-Policy forbids inline handlers.
 document.addEventListener("error", function (ev) { var t = ev.target; if (t && t.tagName === "IMG" && t.hasAttribute("data-rm")) t.remove(); }, true);
-window.RL = { V: V, A: {}, E: {}, PCAT: PCAT, paintNav: renderNav, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
+window.RL = { V: V, A: {}, E: {}, PCAT: PCAT, paintNav: renderNav, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, afterAuth: afterAuth, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
   current: function () { return cur(); }, canBack: function () { return stack.length > 0; }, replace: replace, itemUrl: itemUrl };
 boot();
 window.__reloved = { S: S, UI: UI };

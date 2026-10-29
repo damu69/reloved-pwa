@@ -9,7 +9,7 @@ import * as auth from "./service.js";
 import { authenticate } from "./guard.js";
 
 export const REFRESH_COOKIE = "rl_rt";
-const COOKIE_PATH = "/api/v1/auth";
+export const COOKIE_PATH = "/api/v1/auth";
 
 const email = z.string().trim().toLowerCase().max(254).pipe(z.email());
 // Length limits: 10 minimum for strength, 128 maximum so hashing cannot be abused.
@@ -43,23 +43,25 @@ function csrfCheck(req: FastifyRequest): void {
 // The Android/iOS app (served from its own origin, so the cookie would be third-party and blocked) sends
 // `X-Client: app` and keeps the refresh token itself: it is returned in the body and read back from the body.
 // The website keeps using the httpOnly cookie. Either way the token is single-use and rotates.
-const isApp = (req: FastifyRequest): boolean => req.headers["x-client"] === "app";
+export const isApp = (req: FastifyRequest): boolean => req.headers["x-client"] === "app";
 const bodyToken = (req: FastifyRequest): string | undefined => {
   const t = (req.body as { refreshToken?: unknown } | null | undefined)?.refreshToken;
   return typeof t === "string" && t.length > 0 && t.length <= 300 ? t : undefined;
 };
 
-function sendTokens(req: FastifyRequest, reply: FastifyReply, t: auth.IssuedTokens, status = 200) {
+export function setRefreshCookie(reply: FastifyReply, t: auth.IssuedTokens): void {
+  reply.setCookie(REFRESH_COOKIE, t.refreshToken, {
+    httpOnly: true,
+    secure: reply.server.cfg.COOKIE_SECURE === "true",
+    sameSite: "strict",
+    path: COOKIE_PATH,
+    expires: t.refreshExpiresAt,
+  });
+}
+
+export function sendTokens(req: FastifyRequest, reply: FastifyReply, t: auth.IssuedTokens, status = 200) {
   const app = isApp(req);
-  if (!app) {
-    reply.setCookie(REFRESH_COOKIE, t.refreshToken, {
-      httpOnly: true,
-      secure: reply.server.cfg.COOKIE_SECURE === "true",
-      sameSite: "strict",
-      path: COOKIE_PATH,
-      expires: t.refreshExpiresAt,
-    });
-  }
+  if (!app) setRefreshCookie(reply, t);
   return reply.code(status).send({
     user: t.user,
     accessToken: t.accessToken,
@@ -152,8 +154,8 @@ export async function meRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
   // Deletes (anonymises) the signed-in account after re-entering the password. See auth/deletion.ts.
   app.post("/delete", { config: { rateLimit: { max: 5, timeWindow: "15 minutes", keyGenerator: (r: FastifyRequest) => r.ip } } }, async (req, reply) => {
-    const body = parse(z.object({ password: z.string().min(1).max(200) }).strict(), req.body);
-    await deleteAccount(app.db, req.auth!.userId, body.password, meta(req));
+    const body = parse(z.object({ password: z.string().min(1).max(200).optional(), confirm: z.string().max(20).optional() }).strict(), req.body);
+    await deleteAccount(app.db, req.auth!.userId, body, meta(req));
     reply.clearCookie(REFRESH_COOKIE, { path: COOKIE_PATH });
     return reply.code(204).send();
   });

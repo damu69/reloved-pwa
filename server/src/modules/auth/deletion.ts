@@ -7,9 +7,16 @@ import { Errors } from "../../lib/errors.js";
 import { verifyPassword } from "../../lib/crypto.js";
 import { writeAudit } from "../../lib/audit.js";
 
-export async function deleteAccount(db: Db, userId: string, password: string, meta: { ip?: string | null; requestId?: string | null }): Promise<void> {
+// Accounts with a password re-enter it. Accounts created with Google/Facebook have none, so they type DELETE instead.
+export async function deleteAccount(db: Db, userId: string, proof: { password?: string | undefined; confirm?: string | undefined }, meta: { ip?: string | null; requestId?: string | null }): Promise<void> {
   const u = await db.query(`select password_hash, status from users where id = $1 and deleted_at is null`, [userId]);
-  if (!u.rows[0] || !(await verifyPassword(u.rows[0].password_hash, password))) throw Errors.invalidCredentials();
+  const row = u.rows[0];
+  if (!row) throw Errors.invalidCredentials();
+  if (String(row.password_hash).startsWith("!")) {
+    if (proof.confirm !== "DELETE") throw Errors.validation([{ path: "confirm", message: "Type DELETE to confirm." }]);
+  } else if (!proof.password || !(await verifyPassword(row.password_hash, proof.password))) {
+    throw Errors.invalidCredentials();
+  }
 
   await withTx(db, async (tx) => {
     await tx.query(`select id from users where id = $1 for update`, [userId]);
@@ -44,6 +51,7 @@ export async function deleteAccount(db: Db, userId: string, password: string, me
         where user_id = $1`,
       [userId],
     );
+    await tx.query(`delete from user_identities where user_id = $1`, [userId]);
     await tx.query(`update sessions set revoked_at = now(), revoked_reason = 'logout_all' where user_id = $1 and revoked_at is null`, [userId]);
     await tx.query(`update password_resets set used_at = now() where user_id = $1 and used_at is null`, [userId]);
     await tx.query(

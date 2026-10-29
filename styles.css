@@ -452,3 +452,8 @@ h1{font-size:1.7rem} h2{font-size:1.3rem} h3{font-size:1.05rem}
 .rv-bar i{height:6px;border-radius:3px;background:rgba(128,128,128,.25);overflow:hidden;display:block}.rv-bar u{display:block;height:100%;background:#e0a526;text-decoration:none}
 .rv-list{margin-top:10px}.rv-list summary{cursor:pointer;font-weight:600;padding:6px 0}
 .rv-item{padding:8px 0;border-top:1px solid var(--line,rgba(128,128,128,.2))}.rv-item p{margin:4px 0 0}
+
+/* Sign in with Google / Facebook */
+.social{margin:14px 0 4px;display:flex;flex-direction:column;gap:8px}
+.social .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}.social .or:before,.social .or:after{content:"";flex:1;border-top:1px solid var(--line)}
+.social .btn svg{flex:none}

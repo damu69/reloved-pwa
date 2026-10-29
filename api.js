@@ -77,6 +77,7 @@
     del: function (p, o) { return call("DELETE", p, null, o); },
     upload: function (p, form) { return call("POST", p, form); },
     login: function (email, password) { return raw("POST", "/auth/login", { email: email, password: password }).then(setSession); },
+    social: function (provider, body) { return raw("POST", "/auth/social/" + provider + "/token", body).then(setSession); },
     register: function (b) { return raw("POST", "/auth/register", b).then(setSession); },
     logout: function () { return (IS_APP ? getRt() : Promise.resolve(null)).then(function (rt) { return raw("POST", "/auth/logout", IS_APP ? { refreshToken: rt || undefined } : {}, { headers: { "X-Requested-With": "reloved" } }); }).catch(function () {}).then(function () { token = null; hint("0"); return setRt(null); }); },
     restore: function () { return refresh().then(function () { return true; }, function () { return false; }); },

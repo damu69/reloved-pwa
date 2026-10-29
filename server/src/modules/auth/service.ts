@@ -8,24 +8,25 @@ import { signAccessToken } from "./tokens.js";
 
 export interface RequestMeta { ip: string | null; userAgent: string | null; requestId: string }
 export interface IssuedTokens { accessToken: string; refreshToken: string; refreshExpiresAt: Date; user: PublicUser }
-export interface PublicUser { id: string; email: string; fullName: string; phone: string | null; roles: string[] }
+export interface PublicUser { id: string; email: string; fullName: string; phone: string | null; roles: string[]; hasPassword: boolean; providers: string[] }
 
 const PG_UNIQUE = "23505";
 
 async function loadPublicUser(db: Queryable, userId: string): Promise<PublicUser> {
   const r = await db.query(
-    `select u.id, u.email, u.full_name, u.phone,
-            coalesce(array_agg(ur.role_key order by ur.role_key) filter (where ur.role_key is not null), '{}') as roles
+    `select u.id, u.email, u.full_name, u.phone, u.password_hash,
+            coalesce(array_agg(ur.role_key order by ur.role_key) filter (where ur.role_key is not null), '{}') as roles,
+            (select coalesce(array_agg(i.provider order by i.provider), '{}') from user_identities i where i.user_id = u.id) as providers
        from users u left join user_roles ur on ur.user_id = u.id
       where u.id = $1 group by u.id`,
     [userId],
   );
   const u = r.rows[0];
   if (!u) throw Errors.notFound("User");
-  return { id: u.id, email: u.email, fullName: u.full_name, phone: u.phone, roles: u.roles };
+  return { id: u.id, email: u.email, fullName: u.full_name, phone: u.phone, roles: u.roles, hasPassword: !String(u.password_hash).startsWith("!"), providers: u.providers };
 }
 
-async function issueSession(
+export async function issueSession(
   cfg: Config, tx: Tx, userId: string, family: { id: string; expiresAt: Date } | null, meta: RequestMeta,
 ): Promise<IssuedTokens> {
   const refreshToken = newOpaqueToken();

@@ -66,7 +66,7 @@ Collected and processed on the server. All data is encrypted in transit. Users c
 | Data type | Collected | Shared with third parties | Purpose |
 | --- | --- | --- | --- |
 | Name | Yes | Shared with the seller of an order | Account, order delivery |
-| Email address | Yes | No (processors only) | Account, password reset, receipts |
+| Email address | Yes (also received from Google/Facebook when the person signs in with them) | No (processors only) | Account, password reset, receipts |
 | Phone number | Yes (optional; required for delivery addresses) | Shared with the seller of an order | Delivery |
 | Address | Yes | Shared with the seller of an order | Delivery |
 | User IDs | Yes | No | Account |

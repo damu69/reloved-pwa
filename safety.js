@@ -48,12 +48,14 @@ window.addEventListener("hashchange", openResetLink);
 V.delacct = function () {
   if (!R.signedIn()) return V.gate("Delete account", "Sign in first.");
   return head("Delete account", true) + '<div class="banner warn"><b>This cannot be undone</b><span class="small">Your profile, addresses, favourites and cart are removed. If you sell, your listings are taken down. Order and payment records are kept because the law requires it, but they no longer show your name or contact details. You cannot delete the account while an order or return is still in progress.</span></div>' +
-    '<form id="daf" novalidate><label class="field"><span>Enter your password to confirm</span><input class="inp" id="da_p" type="password" autocomplete="current-password"></label><p class="bad small" id="da_err"></p><button class="btn danger block" type="submit">Delete my account</button></form>';
+    '<form id="daf" novalidate>' + (S.user && S.user.hasPassword === false ? '<label class="field"><span>Type DELETE to confirm</span><input class="inp" id="da_p" autocomplete="off" autocapitalize="characters"></label>' : '<label class="field"><span>Enter your password to confirm</span><input class="inp" id="da_p" type="password" autocomplete="current-password"></label>') + '<p class="bad small" id="da_err"></p><button class="btn danger block" type="submit">Delete my account</button></form>';
 };
 async function sendDelete() {
-  var p = $("da_p").value; if (!p) return say("da_err", "Enter your password.");
+  var p = $("da_p").value, noPw = S.user && S.user.hasPassword === false;
+  if (noPw && p.trim() !== "DELETE") return say("da_err", "Type DELETE (capital letters) to confirm.");
+  if (!p) return say("da_err", "Enter your password.");
   var btn = document.querySelector("#daf button[type=submit]"); busy(btn, true, "Delete my account");
-  try { await api.post("/me/delete", { password: p }); toast("Your account has been deleted."); setTimeout(function () { location.href = "/"; }, 900); }
+  try { await api.post("/me/delete", noPw ? { confirm: "DELETE" } : { password: p }); toast("Your account has been deleted."); setTimeout(function () { location.href = "/"; }, 900); }
   catch (x) { busy(btn, false, "Delete my account"); say("da_err", x.code === "INVALID_CREDENTIALS" ? "That password is not correct." : errText(x)); }
 }
 

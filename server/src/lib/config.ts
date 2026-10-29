@@ -53,6 +53,14 @@ const schema = z.object({
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(10).optional(),
   DEBUG_DIAGNOSTICS: z.enum(["true", "false"]).default("false"),
+  // Social sign-in. Each provider is on only when both of its values are set. Google: OAuth "Web application" client
+  // (the Android app's Google token is issued for this same web client id). Facebook: app id and app secret.
+  GOOGLE_CLIENT_ID: z.string().min(10).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(10).optional(),
+  FACEBOOK_APP_ID: z.string().min(5).optional(),
+  FACEBOOK_APP_SECRET: z.string().min(10).optional(),
+  // Facebook "client token" (Meta app dashboard > Settings > Advanced). Not a secret: the Android app embeds it to start native login.
+  FACEBOOK_CLIENT_TOKEN: z.string().min(10).optional(),
   // Payment provider. none (default): checkout works but orders cannot be paid (they expire).
   // mock: a fake provider for development and tests, only when set explicitly; refused in production,
   // because anyone signed in could mark their own orders paid. Razorpay arrives later.
@@ -87,6 +95,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (Boolean(c.UPSTASH_REDIS_REST_URL) !== Boolean(c.UPSTASH_REDIS_REST_TOKEN)) {
     throw new Error("UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set together");
   }
+  if (Boolean(c.GOOGLE_CLIENT_ID) !== Boolean(c.GOOGLE_CLIENT_SECRET)) throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set together");
+  if (Boolean(c.FACEBOOK_APP_ID) !== Boolean(c.FACEBOOK_APP_SECRET)) throw new Error("FACEBOOK_APP_ID and FACEBOOK_APP_SECRET must be set together");
   let MOCK_PAYMENT_SECRET = c.MOCK_PAYMENT_SECRET ?? "";
   if (c.PAYMENT_PROVIDER === "mock" && !MOCK_PAYMENT_SECRET) {
     if (c.NODE_ENV !== "test") throw new Error("MOCK_PAYMENT_SECRET (32+ random characters) is required with PAYMENT_PROVIDER=mock");

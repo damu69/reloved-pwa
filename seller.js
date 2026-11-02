@@ -179,19 +179,33 @@ document.addEventListener("change", async function (ev) {
     t.value = "";
   }
   if (t.dataset && t.dataset.img && t.files && t.files.length) {
-    var pid = t.dataset.img, files = Array.prototype.slice.call(t.files), okn = 0;
-    for (var k = 0; k < files.length; k++) {
-      try {
-        toast("Uploading photo " + (k + 1) + " of " + files.length + "…");
-        var ph = await H.shrink(files[k], 1600, 0.85);
-        if (ph.size > H.MAXBYTES) { toast("A photo is too large. Try another."); continue; }
-        var fd2 = new FormData(); fd2.append("file", ph, ph.name); await api.upload("/seller/products/" + pid + "/images", fd2); okn++;
-      } catch (e) { toast(errText(e)); }
-    }
-    drop("sl:prod:" + pid); if (okn) toast(okn + " photo" + (okn > 1 ? "s" : "") + " added"); R.render();
+    // Do not upload yet: show what was picked and wait for an explicit confirm (see A.slimgok).
+    clearStaged();
+    var picked = Array.prototype.slice.call(t.files).filter(function (f) { return /^image\//.test(f.type); });
     t.value = "";
+    if (!picked.length) { toast("Pick photos (JPG, PNG or WebP)."); return; }
+    staged = { pid: t.dataset.img, files: picked, urls: picked.map(function (f) { return URL.createObjectURL(f); }) };
+    R.render();
   }
 });
+var staged = null; // photos picked but not uploaded yet
+function clearStaged() { if (staged) { staged.urls.forEach(function (u) { URL.revokeObjectURL(u); }); staged = null; } }
+A.slimgno = function () { clearStaged(); R.render(); };
+A.slimgrm = function (pid, k) { if (!staged || staged.pid !== pid) return; URL.revokeObjectURL(staged.urls[k]); staged.files.splice(k, 1); staged.urls.splice(k, 1); if (!staged.files.length) staged = null; R.render(); };
+A.slimgok = async function (pid) {
+  if (!staged || staged.pid !== pid) return;
+  var files = staged.files.slice(), okn = 0;
+  clearStaged(); R.render();
+  for (var k = 0; k < files.length; k++) {
+    try {
+      toast("Uploading photo " + (k + 1) + " of " + files.length + "…");
+      var ph = await H.shrink(files[k], 1600, 0.85);
+      if (ph.size > H.MAXBYTES) { toast("A photo is too large. Try another."); continue; }
+      var fd2 = new FormData(); fd2.append("file", ph, ph.name); await api.upload("/seller/products/" + pid + "/images", fd2); okn++;
+    } catch (e) { toast(errText(e)); }
+  }
+  drop("sl:prod:" + pid); if (okn) toast(okn + " photo" + (okn > 1 ? "s" : "") + " added"); R.render();
+};
 
 /* ---------- small helpers ---------- */
 // First tap arms the button (label changes); the second tap confirms. Typed text is kept across the redraw.
@@ -255,7 +269,7 @@ V.slprod = function (id) {
   // photos
   out += '<h3 style="margin:14px 0 6px">Photos</h3><div class="thumbs">' + p.images.map(function (im) {
     return '<div style="position:relative">' + H.thumb("", "/seller/products/" + p.id + "/images/" + im.id + "/200") + (locked ? "" : '<button class="heart" style="right:2px;top:2px;bottom:auto" data-a="slimgdel" data-i="' + esc(p.id) + '" data-j="' + esc(im.id) + '" aria-label="Remove photo"><span style="color:#fff;font-weight:700">×</span></button>') + (im.status !== "active" ? '<span class="tag" style="position:absolute;left:2px;bottom:2px;background:rgba(0,0,0,.7);color:#fff;font-size:.6rem;padding:2px 5px;border-radius:6px">' + (im.status === "pending_remove" ? "removing" : "in review") + "</span>" : "") + "</div>";
-  }).join("") + "</div>" + (locked ? "" : '<label class="upl">+ Add photos<input type="file" data-img="' + esc(p.id) + '" accept="image/jpeg,image/png,image/webp" multiple hidden></label>');
+  }).join("") + "</div>" + (!locked && staged && staged.pid === p.id ? '<div class="banner"><b>Add ' + staged.files.length + " photo" + (staged.files.length > 1 ? "s" : "") + '?</b><span class="small muted">Only these photos will be uploaded. Remove any you did not mean to pick.</span></div><div class="thumbs">' + staged.urls.map(function (u, k) { return '<div style="position:relative"><img src="' + u + '" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px"><button class="heart" style="right:2px;top:2px;bottom:auto" data-a="slimgrm" data-i="' + esc(p.id) + '" data-j="' + k + '" aria-label="Remove from selection"><span style="color:#fff;font-weight:700">×</span></button></div>'; }).join("") + '</div><button class="btn block" data-a="slimgok" data-i="' + esc(p.id) + '">Upload ' + staged.files.length + '</button><button class="btn ghost block" data-a="slimgno">Cancel</button>' : "") + (locked ? "" : '<label class="upl">+ Add photos<input type="file" data-img="' + esc(p.id) + '" accept="image/jpeg,image/png,image/webp" multiple hidden></label>');
   // variants
   var inv = L.inv.data ? L.inv.data.items : [], lvl = {}; inv.forEach(function (x) { lvl[x.variantId] = x; });
   out += '<h3 style="margin:14px 0 6px">Sizes, prices and stock</h3>';

@@ -17,6 +17,19 @@ H.leaves = function () {
   function label(c) { var parts = [], x = c; while (x) { parts.unshift(x.name); x = x.parentId ? byId[x.parentId] : null; } return parts.join(" › "); }
   return S.cats.filter(function (c) { return !S.cats.some(function (d) { return d.parentId === c.id; }); }).map(function (c) { return [c.id, label(c)]; }).sort(function (a, b) { return a[1] < b[1] ? -1 : 1; });
 };
+// Category picker as two steps: top-level category, then the sub category (a leaf) under it.
+H.catGroups = function () {
+  var byId = {}; S.cats.forEach(function (c) { byId[c.id] = c; });
+  function top(c) { var x = c; while (x.parentId && byId[x.parentId]) x = byId[x.parentId]; return x; }
+  function rel(c, t) { var parts = [], x = c; while (x && x.id !== t.id) { parts.unshift(x.name); x = x.parentId ? byId[x.parentId] : null; } return parts.join(" › ") || c.name; }
+  var groups = {}, order = [];
+  S.cats.filter(function (c) { return !S.cats.some(function (d) { return d.parentId === c.id; }); }).forEach(function (c) {
+    var t = top(c); if (!groups[t.id]) { groups[t.id] = { id: t.id, name: t.name, subs: [] }; order.push(t.id); }
+    groups[t.id].subs.push([c.id, rel(c, t)]);
+  });
+  return order.map(function (k) { groups[k].subs.sort(function (a, b) { return a[1] < b[1] ? -1 : 1; }); return groups[k]; }).sort(function (a, b) { return a.name < b.name ? -1 : 1; });
+};
+H.subOpts = function (g, cur) { return g.subs.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (o[0] === cur ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join(""); };
 H.allCats = function () {
   var byId = {}; S.cats.forEach(function (c) { byId[c.id] = c; });
   function label(c) { var parts = [], x = c; while (x) { parts.unshift(x.name); x = x.parentId ? byId[x.parentId] : null; } return parts.join(" › "); }
@@ -166,6 +179,11 @@ A.slsubmit = async function () {
   catch (e) { var er = $("slerr"); var m = errText(e); if (e.code === "APPLICATION_INCOMPLETE" && e.details && e.details.length) m = "Still missing: " + e.details.map(function (d) { return String(d.path).replace("document:", "").replace(/_/g, " "); }).join(", ") + "."; if (er) er.textContent = m; else toast(m); }
 };
 document.addEventListener("change", async function (ev) {
+  if (ev.target && ev.target.id === "pf_c0") {
+    var g0 = H.catGroups().filter(function (x) { return x.id === ev.target.value; })[0], sel = $("pf_c"), w = $("pf_cw");
+    if (g0 && sel) { sel.innerHTML = H.subOpts(g0, ""); if (w) w.hidden = g0.subs.length === 1 && g0.subs[0][0] === g0.id; }
+    return;
+  }
   var t = ev.target;
   if (t.dataset && t.dataset.up && t.files && t.files[0]) {
     var f = t.files[0], type = t.dataset.up;
@@ -250,9 +268,16 @@ V.slprod = function (id) {
   var conds = Object.keys(R.COND).map(function (k) { return [k, R.COND[k]]; });
   var cats = H.leaves();
   if (isNew && !cats.length) return head("New product", true) + '<div class="empty"><h2>No categories yet</h2>The marketplace admin has to add categories first.</div>';
+  var groups = H.catGroups();
+  function catFields(cur) {
+    var g = groups.filter(function (x) { return x.subs.some(function (o) { return o[0] === cur; }); })[0] || groups[0];
+    var only = g.subs.length === 1 && g.subs[0][0] === g.id;
+    return H.sel("Category", "pf_c0", groups.map(function (x) { return [x.id, x.name]; }), g.id) +
+      '<label class="field" id="pf_cw"' + (only ? ' hidden' : '') + '><span>Sub category</span><select class="inp" id="pf_c">' + H.subOpts(g, cur) + "</select></label>";
+  }
   function form(p) {
     var attrs = p.attributes && p.attributes.colour ? p.attributes.colour : "";
-    return H.fld("Title", "pf_t", p.title, 'maxlength="150"') + H.area("Description", "pf_d", p.description, 'maxlength="5000"') + H.sel("Category", "pf_c", cats, p.categoryId) + H.sel("Brand", "pf_b", brands, p.brandId || "") + H.sel("Condition", "pf_n", conds, p.condition || "good") +
+    return H.fld("Title", "pf_t", p.title, 'maxlength="150"') + H.area("Description", "pf_d", p.description, 'maxlength="5000"') + catFields(p.categoryId) + H.sel("Brand", "pf_b", brands, p.brandId || "") + H.sel("Condition", "pf_n", conds, p.condition || "good") +
       H.sel("GST rate", "pf_g", gst, p.gstRateBp != null ? p.gstRateBp : (gst[0] ? gst[0][0] : 0)) + H.fld("HSN code (optional)", "pf_h", p.hsnCode || "", 'inputmode="numeric" maxlength="8"');
   }
   if (isNew) return head("New product", true) + '<form id="pfn" novalidate>' + form({}) + '<p class="bad small" id="pferr"></p><button class="btn block" type="submit">Save and continue</button></form><p class="muted small">Next you add photos, sizes, prices and stock.</p>';

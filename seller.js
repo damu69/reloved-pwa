@@ -30,6 +30,24 @@ H.catGroups = function () {
   return order.map(function (k) { groups[k].subs.sort(function (a, b) { return a[1] < b[1] ? -1 : 1; }); return groups[k]; }).sort(function (a, b) { return a.name < b.name ? -1 : 1; });
 };
 H.subOpts = function (g, cur) { return g.subs.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (o[0] === cur ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join(""); };
+// Two-step picker for any category (admin): top-level select (id base+"0") then a select (id base) holding the top itself plus everything inside it.
+H.catPairOpts = function (top, cur, firstLabel) {
+  if (!top) return '<option value="">' + esc(firstLabel) + "</option>";
+  var byId = {}; S.cats.forEach(function (c) { byId[c.id] = c; });
+  var t = byId[top], list = [];
+  S.cats.forEach(function (c) { var x = c, ok = false; while (x && x.parentId) { x = byId[x.parentId]; if (x && x.id === top) { ok = true; break; } } if (ok) { var parts = [], y = c; while (y && y.id !== top) { parts.unshift(y.name); y = y.parentId ? byId[y.parentId] : null; } list.push([c.id, parts.join(" › ")]); } });
+  list.sort(function (a, b) { return a[1] < b[1] ? -1 : 1; });
+  return [[top, firstLabel]].concat(list).map(function (o) { return '<option value="' + esc(o[0]) + '"' + (o[0] === cur ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("");
+};
+H.catPair = function (base, label, cur, allowTop, firstLabel) {
+  var byId = {}; S.cats.forEach(function (c) { byId[c.id] = c; });
+  var x = cur ? byId[cur] : null; while (x && x.parentId && byId[x.parentId]) x = byId[x.parentId];
+  var tops = S.cats.filter(function (c) { return !c.parentId; }).sort(function (a, b) { return a.name < b.name ? -1 : 1; }).map(function (c) { return [c.id, c.name]; });
+  var topId = x ? x.id : (allowTop ? "" : (tops[0] ? tops[0][0] : ""));
+  var topOpts = (allowTop ? [["", "Top level"]] : []).concat(tops);
+  return H.sel(label, base + "0", topOpts, topId, 'data-pair="' + base + '" data-first="' + esc(firstLabel) + '"') +
+    '<label class="field" id="' + base + 'w"' + (topId ? "" : " hidden") + '><span>Sub category</span><select class="inp" id="' + base + '">' + H.catPairOpts(topId, cur || topId, firstLabel) + "</select></label>";
+};
 H.allCats = function () {
   var byId = {}; S.cats.forEach(function (c) { byId[c.id] = c; });
   function label(c) { var parts = [], x = c; while (x) { parts.unshift(x.name); x = x.parentId ? byId[x.parentId] : null; } return parts.join(" › "); }
@@ -179,6 +197,12 @@ A.slsubmit = async function () {
   catch (e) { var er = $("slerr"); var m = errText(e); if (e.code === "APPLICATION_INCOMPLETE" && e.details && e.details.length) m = "Still missing: " + e.details.map(function (d) { return String(d.path).replace("document:", "").replace(/_/g, " "); }).join(", ") + "."; if (er) er.textContent = m; else toast(m); }
 };
 document.addEventListener("change", async function (ev) {
+  if (ev.target && ev.target.dataset && ev.target.dataset.pair) {
+    var bs = ev.target.dataset.pair, sl = $(bs), wr = $(bs + "w");
+    if (sl) sl.innerHTML = H.catPairOpts(ev.target.value, "", ev.target.dataset.first);
+    if (wr) wr.hidden = !ev.target.value;
+    return;
+  }
   if (ev.target && ev.target.id === "pf_c0") {
     var g0 = H.catGroups().filter(function (x) { return x.id === ev.target.value; })[0], sel = $("pf_c"), w = $("pf_cw");
     if (g0 && sel) { sel.innerHTML = H.subOpts(g0, ""); if (w) w.hidden = g0.subs.length === 1 && g0.subs[0][0] === g0.id; }

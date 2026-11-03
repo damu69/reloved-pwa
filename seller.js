@@ -322,14 +322,15 @@ V.slprod = function (id) {
   // variants
   var inv = L.inv.data ? L.inv.data.items : [], lvl = {}; inv.forEach(function (x) { lvl[x.variantId] = x; });
   out += '<h3 style="margin:14px 0 6px">Sizes, prices and stock</h3>';
-  if (!p.variants.length) out += '<p class="muted small">Add at least one option with a price.</p>';
+  if (!p.variants.length) out += '<p class="muted small">Add at least one size with a price. For a single item, choose One size.</p>';
   p.variants.forEach(function (v) {
     var l = lvl[v.id], label = Object.keys(v.options || {}).map(function (k) { return v.options[k]; }).join(" / ") || v.sku;
     out += '<div class="list"><div class="row" style="display:block"><b>' + esc(label) + '</b> <span class="muted small">' + esc(v.sku) + "</span>" + (v.isActive ? "" : " " + H.pill("Hidden", "")) +
       '<div class="two" style="margin-top:8px">' + H.fld("Price (₹)", "vp_" + v.id, (v.pricePaise / 100), 'inputmode="decimal"') + H.fld("MRP (₹)", "vm_" + v.id, (v.mrpPaise / 100), 'inputmode="decimal"') + "</div>" + H.fld("In stock" + (l ? " · " + l.reserved + " reserved, " + l.sold + " sold" : ""), "vs_" + v.id, l ? l.onHand : 0, 'inputmode="numeric"') +
       (locked ? "" : '<div class="two"><button class="btn sm" data-a="slvsave" data-i="' + esc(p.id) + '" data-j="' + esc(v.id) + '">Save</button><button class="btn danger sm" data-a="slvdel" data-i="' + esc(p.id) + '" data-j="' + esc(v.id) + '">' + (R.UI.confirm === v.id ? "Tap again" : "Remove") + "</button></div>") + "</div></div>";
   });
-  if (!locked) out += '<details class="list" ' + (p.variants.length ? "" : "open") + '><summary class="row" style="cursor:pointer"><span class="l"><b>+ Add a size or option</b></span></summary><div style="padding:0 14px 14px">' + H.fld("Option name (e.g. M, EU 41, One size)", "nv_o", "") + H.fld("SKU (your own code)", "nv_s", "", 'autocapitalize="characters"') + '<div class="two">' + H.fld("Price (₹)", "nv_p", "", 'inputmode="decimal"') + H.fld("MRP (₹)", "nv_m", "", 'inputmode="decimal"') + "</div>" + H.fld("Stock", "nv_q", "1", 'inputmode="numeric"') + '<button class="btn block" data-a="sladdv" data-i="' + esc(p.id) + '">Add option</button></div></details>';
+  if (!locked) out += '<details class="list" ' + (p.variants.length ? "" : "open") + '><summary class="row" style="cursor:pointer"><span class="l"><b>+ Add size and price</b></span></summary><div style="padding:0 14px 14px">' + H.fld("Size or option", "nv_o", "", 'maxlength="40" autocomplete="off" placeholder="e.g. M, EU 41, Red"') + '<div class="chips" style="margin:-4px 0 4px">' + ["One size", "XS", "S", "M", "L", "XL", "XXL"].map(function (z) { return '<button type="button" class="chip" data-a="slsz" data-i="' + z + '">' + z + "</button>"; }).join("") + '</div><p class="muted small" style="margin:0 0 10px">What the buyer picks. Selling a single item? Tap One size.</p>' +
+      H.fld("Item code (optional)", "nv_s", "", 'maxlength="40" autocomplete="off" autocapitalize="characters" placeholder="e.g. JKT-01"') + '<p class="muted small" style="margin:0 0 10px">Your own code to find this item in your stock. Buyers never see it. Leave it empty and we make one for you.</p>' + '<div class="two">' + H.fld("Price (₹)", "nv_p", "", 'inputmode="decimal"') + H.fld("MRP (₹)", "nv_m", "", 'inputmode="decimal"') + "</div>" + H.fld("How many do you have?", "nv_q", "1", 'inputmode="numeric"') + '<button class="btn block" data-a="sladdv" data-i="' + esc(p.id) + '">Add size and price</button></div></details>';
   // details
   if (locked) out += '<h3 style="margin:14px 0 6px">Details</h3><div class="list"><div class="row" style="display:block">' + esc(p.categoryPath || p.categoryName) + " · " + esc(R.COND[p.condition] || p.condition) + "<br>" + esc(p.description || "") + "</div></div>";
   else out += '<h3 style="margin:14px 0 6px">Details</h3><form id="pfe" data-id="' + esc(p.id) + '" novalidate>' + form(p) + '<p class="bad small" id="pferr"></p><button class="btn ghost block" type="submit">Save details</button></form>';
@@ -378,9 +379,10 @@ A.slvsave = async function (pid, vid) {
     drop("sl:prod:" + pid); drop("sl:inv:" + pid); drop("sl:prods"); toast("Saved"); R.render();
   } catch (e) { toast(errText(e)); if (e.code === "STOCK_CHANGED" || e.status === 409) { drop("sl:inv:" + pid); R.render(); } }
 };
+A.slsz = function (z) { var e = $("nv_o"); if (e) { e.value = z; e.focus(); } };
 A.sladdv = async function (pid) {
   var name = val("nv_o"), sku = val("nv_s"), price = H.paise("nv_p"), mrp = H.paise("nv_m"), q = parseInt(val("nv_q"), 10);
-  if (!name) return toast("Give the option a name, for example M or One size.");
+  if (!name) return toast("Enter a size or option, for example M, or tap One size.");
   if (!sku) sku = (pid.slice(0, 4) + "-" + name).replace(/[^A-Za-z0-9._-]/g, "").toUpperCase();
   if (!(price >= 100)) return toast("Enter a price of at least ₹1.");
   if (isNaN(mrp)) mrp = price;

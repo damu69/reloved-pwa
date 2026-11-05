@@ -145,7 +145,7 @@ function failBox(msg, retry) { return '<div class="empty"><h2>Could not load</h2
 /* ============ state ============ */
 var S = { user: null, perms: [], cats: [], cart: null, wish: {}, ready: false };
 var stack = [], tab = "home";
-var UI = { rate: {}, q: "", cat: "", cond: "", brand: "", size: "", colour: "", sort: "", minp: "", maxp: "", sellerId: "", sellerName: "", fil: false, feed: { items: [], next: null, loading: false, error: null, key: "", loaded: false },
+var UI = { rate: {}, q: "", cat: "", cond: "", brand: "", size: "", colour: "", sort: "", gender: "", minp: "", maxp: "", sellerId: "", sellerName: "", fil: false, feed: { items: [], next: null, loading: false, error: null, key: "", loaded: false },
   auth: { mode: "login", busy: false, err: "" }, ck: { addressId: "", idem: null, busy: false, adding: false, err: "" }, coupon: "", pdv: {}, confirm: null, busy: false };
 var C = {}; // per-view fetched data: key -> {st:"loading"|"ok"|"err", data, err}
 
@@ -167,7 +167,7 @@ async function loadCart() { try { S.cart = await api.get("/cart"); } catch (e) {
 async function loadWish() { try { var r = await api.get("/me/wishlist"); S.wish = {}; (r.items || []).forEach(function (i) { S.wish[i.productId] = i; }); } catch (e) { S.wish = {}; } }
 function clearSession() { S.user = null; S.perms = []; S.cart = null; S.wish = {}; C = {}; UI.ck = { addressId: "", idem: null, busy: false, adding: false, err: "" }; }
 
-function feedKey() { return [UI.q, UI.cat, UI.cond, UI.brand, UI.size, UI.colour, UI.sort, UI.minp, UI.maxp, UI.sellerId].join("|"); }
+function feedKey() { return [UI.q, UI.cat, UI.cond, UI.brand, UI.size, UI.colour, UI.gender, UI.sort, UI.minp, UI.maxp, UI.sellerId].join("|"); }
 function feedUrl(cursor) {
   var p = ["limit=24"];
   if (UI.q.trim()) p.push("q=" + encodeURIComponent(UI.q.trim()));
@@ -176,6 +176,7 @@ function feedUrl(cursor) {
   if (UI.brand) p.push("brand=" + encodeURIComponent(UI.brand));
   if (UI.size.trim()) p.push("size=" + encodeURIComponent(UI.size.trim()));
   if (UI.colour) p.push("colour=" + encodeURIComponent(UI.colour));
+  if (UI.gender) p.push("gender=" + encodeURIComponent(UI.gender));
   if (UI.sort) p.push("sort=" + encodeURIComponent(UI.sort));
   if (UI.minp > 0) p.push("minPrice=" + encodeURIComponent(UI.minp));
   if (UI.maxp > 0) p.push("maxPrice=" + encodeURIComponent(UI.maxp));
@@ -379,6 +380,7 @@ function activesHTML() {
   condSet().forEach(function (k) { ch(COND[k] || k, "cond", k); });
   if (UI.size.trim()) ch("Size " + UI.size.trim(), "size");
   if (UI.colour) ch(UI.colour, "colour");
+  if (UI.gender) ch(GENDERS[UI.gender] || UI.gender, "gender");
   if (UI.minp || UI.maxp) ch(UI.minp && UI.maxp ? "₹" + UI.minp + " – ₹" + UI.maxp : UI.minp ? "From ₹" + UI.minp : "Up to ₹" + UI.maxp, "price");
   return out.length ? out.join("") + '<button class="linkbtn" data-a="filclear">Clear all</button>' : "";
 }
@@ -475,13 +477,15 @@ function cartLink() {
 var SIZES = ["XS", "S", "M", "L", "XL", "XXL", "Free size", "UK 5", "UK 6", "UK 7", "UK 8", "UK 9", "UK 10", "EU 36", "EU 37", "EU 38", "EU 39", "EU 40", "EU 41", "EU 42"];
 var COLOURS = ["Black", "White", "Grey", "Blue", "Navy", "Red", "Maroon", "Pink", "Green", "Yellow", "Mustard", "Orange", "Brown", "Beige", "Gold", "Silver"];
 function condSet() { return UI.cond ? UI.cond.split(",") : []; }
-function filterCount() { return [UI.brand, UI.cond, UI.size, UI.colour, UI.minp, UI.maxp].filter(Boolean).length; }
+var GENDERS = { women: "Women", men: "Men", girls: "Girls", boys: "Boys" };
+function filterCount() { return [UI.gender, UI.brand, UI.cond, UI.size, UI.colour, UI.minp, UI.maxp].filter(Boolean).length; }
 function loadBrands() { if (S.brands) return; S.brands = []; api.get("/catalogue/brands", { anon: true }).then(function (r) { S.brands = r.items || []; refresh(); }, function () { S.brands = null; }); }
 function opt(v, label, cur) { return '<option value="' + esc(v) + '"' + (v === cur ? " selected" : "") + ">" + esc(label) + "</option>"; }
 function filtersHTML() {
   var cs = condSet();
   function grp(title, body, open) { return '<details class="fgrp"' + (open === false ? "" : " open") + "><summary>" + title + "</summary>" + body + "</details>"; }
   return '<div class="banner filters"><h3 class="filtitle">Filters</h3>' +
+    grp("Gender", '<div class="field"><div class="chips wrap">' + Object.keys(GENDERS).map(function (k) { var on = UI.gender === k; return '<button class="chip' + (on ? " on" : "") + '" data-a="gendertog" data-i="' + k + '" aria-pressed="' + on + '">' + GENDERS[k] + "</button>"; }).join("") + "</div></div>") +
     grp("Brand", '<label class="field"><select class="inp" id="fb" data-f="1" aria-label="Brand">' + opt("", "Any brand", UI.brand) + (S.brands || []).map(function (b) { return opt(b.slug, b.name, UI.brand); }).join("") + "</select></label>") +
     grp("Condition", '<div class="field"><div class="chips wrap">' + Object.keys(COND).map(function (k) { var on = cs.indexOf(k) > -1; return '<button class="chip' + (on ? " on" : "") + '" data-a="condtog" data-i="' + k + '" aria-pressed="' + on + '">' + COND[k] + "</button>"; }).join("") + "</div></div>") +
     grp("Size and colour", '<div class="two"><label class="field"><span>Size</span><input class="inp" id="fz" data-f="1" list="fzl" value="' + esc(UI.size) + '" placeholder="Any, e.g. M or UK 7" autocomplete="off"><datalist id="fzl">' + SIZES.map(function (s) { return '<option value="' + s + '">'; }).join("") + "</datalist></label>" +
@@ -821,8 +825,9 @@ async function act(a, i, j, el) {
     case "scrolllist": { var lt = $("listing-top"); if (lt) lt.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     case "hidefil": UI.hidefil = !UI.hidefil; render(); return;
     case "fil": UI.fil = !UI.fil; if (UI.fil) loadBrands(); render(); return;
+    case "gendertog": UI.gender = UI.gender === i ? "" : i; loadFeed(false); render(); return;
     case "condtog": { var cs = condSet(), at = cs.indexOf(i); if (at > -1) cs.splice(at, 1); else cs.push(i); UI.cond = cs.join(","); loadFeed(false); render(); return; }
-    case "filclear": UI.cond = UI.brand = UI.size = UI.colour = UI.minp = UI.maxp = ""; UI.sort = ""; loadFeed(false); render(); return;
+    case "filclear": UI.cond = UI.brand = UI.size = UI.colour = UI.gender = UI.minp = UI.maxp = ""; UI.sort = ""; loadFeed(false); render(); return;
     case "more": loadFeed(true); return;
     case "feedretry": loadFeed(UI.feed.items.length > 0); return;
     case "seller": UI.sellerId = i; UI.sellerName = j; UI.cat = ""; UI.q = ""; stack = []; tab = "home"; navPush(); loadFeed(false); render(); return;

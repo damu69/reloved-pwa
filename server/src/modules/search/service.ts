@@ -13,6 +13,7 @@ export interface SearchParams {
   conditions?: string[] | undefined;
   sizes?: string[] | undefined;      // variant size option, case-insensitive exact match
   colours?: string[] | undefined;    // words looked for inside the product's colour attribute
+  genders?: string[] | undefined;    // boys | girls | men | women, matched exactly against the gender attribute
   minPricePaise?: number | undefined;
   maxPricePaise?: number | undefined;
   includeOutOfStock?: boolean | undefined;   // default: sold-out products are hidden
@@ -92,6 +93,9 @@ export class PostgresSearch implements SearchService {
       // Colour is free text ("Red and white"), so look for each chosen word in it. Words are letters only (validated), so no LIKE wildcards.
       where.push(`exists (select 1 from products pr where pr.id = ps.product_id
         and pr.attributes ->> 'colour' ilike any(${arg(p.colours.map((c) => "%" + c + "%"))}))`);
+    }
+    if (p.genders?.length) {
+      where.push(`exists (select 1 from products pr where pr.id = ps.product_id and pr.attributes ->> 'gender' = any(${arg(p.genders)}))`);
     }
     if (p.minPricePaise !== undefined) where.push(`ps.min_price_paise >= ${arg(p.minPricePaise)}`);
     if (!p.includeOutOfStock) where.push("ps.in_stock");

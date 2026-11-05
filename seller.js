@@ -300,8 +300,8 @@ V.slprod = function (id) {
       '<label class="field" id="pf_cw"' + (only ? ' hidden' : '') + '><span>Sub category</span><select class="inp" id="pf_c">' + H.subOpts(g, cur) + "</select></label>";
   }
   function form(p) {
-    var attrs = p.attributes && p.attributes.colour ? p.attributes.colour : "";
-    return H.fld("Title", "pf_t", p.title, 'maxlength="150"') + H.area("Description", "pf_d", p.description, 'maxlength="5000"') + catFields(p.categoryId) + H.sel("Brand", "pf_b", brands, p.brandId || "") + H.sel("Condition", "pf_n", conds, p.condition || "good") +
+    formAttrs = p.attributes || {};
+    return H.fld("Title", "pf_t", p.title, 'maxlength="150"') + H.area("Description", "pf_d", p.description, 'maxlength="5000"') + H.sel("Gender", "pf_gd", [["", "Not gender specific"], ["women", "Women"], ["men", "Men"], ["girls", "Girls"], ["boys", "Boys"]], formAttrs.gender || "") + catFields(p.categoryId) + H.sel("Brand", "pf_b", brands, p.brandId || "") + H.sel("Condition", "pf_n", conds, p.condition || "good") +
       H.sel("GST rate", "pf_g", gst, p.gstRateBp != null ? p.gstRateBp : (gst[0] ? gst[0][0] : 0)) + H.fld("HSN code (optional)", "pf_h", p.hsnCode || "", 'inputmode="numeric" maxlength="8"');
   }
   if (isNew) return head("New product", true) + '<form id="pfn" novalidate>' + form({}) + '<p class="bad small" id="pferr"></p><button class="btn block" type="submit">Save and continue</button></form><p class="muted small">Next you add photos, sizes, prices and stock.</p>';
@@ -344,8 +344,12 @@ V.slprod = function (id) {
   if (p.status === "draft" || p.status === "rejected") out += '<button class="btn danger block" data-a="slpdel" data-i="' + esc(p.id) + '">' + (R.UI.confirm === "del" + p.id ? "Tap again to delete" : "Delete product") + "</button>";
   return out + "</div>";
 };
+var formAttrs = {};
 function productBody() {
   var b = { title: val("pf_t"), description: val("pf_d"), categoryId: val("pf_c"), condition: val("pf_n"), gstRateBp: parseInt(val("pf_g"), 10), brandId: val("pf_b") || null, hsnCode: val("pf_h") || null };
+  var at = Object.assign({}, formAttrs), g = val("pf_gd"); // keep other attributes (such as colour), set or clear gender
+  if (g) at.gender = g; else delete at.gender;
+  b.attributes = at;
   return b;
 }
 document.addEventListener("submit", async function (ev) {

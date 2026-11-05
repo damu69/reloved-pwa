@@ -245,6 +245,18 @@ describe("scale", () => {
   }, 120_000);
 });
 
+describe("gender filter", () => {
+  it("matches the gender attribute exactly and rejects unknown values", async () => {
+    await product({ title: "Kids kurta set", price: 900, cat: kurtas, brand: null, attrs: { gender: "boys" } });
+    await product({ title: "Silk kurta tunic", price: 1400, cat: kurtas, brand: null, attrs: { gender: "women" } });
+    expect(await ids("/products?q=kurta&gender=boys")).toEqual(["Kids kurta set"]);
+    expect(await ids("/products?q=kurta&gender=women")).toEqual(["Silk kurta tunic"]);
+    expect((await ids("/products?q=kurta&gender=boys,women")).sort()).toEqual(["Kids kurta set", "Silk kurta tunic"]);
+    expect(await ids("/products?q=kurta&gender=men")).toEqual([]);
+    expect((await get("/products?gender=unisex")).statusCode).toBe(400);
+  });
+});
+
 describe("size and colour filters", () => {
   it("matches a variant's size option in any case, and colour words inside the free-text colour", async () => {
     const id = await product({ title: "Bandhgala sherwani", price: 2500, cat: kurtas, brand: null, attrs: { colour: "Mustard and gold" } });

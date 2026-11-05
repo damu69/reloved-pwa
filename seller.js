@@ -292,16 +292,9 @@ V.slprod = function (id) {
   var conds = Object.keys(R.COND).map(function (k) { return [k, R.COND[k]]; });
   var cats = H.leaves();
   if (isNew && !cats.length) return head("New product", true) + '<div class="empty"><h2>No categories yet</h2>The marketplace admin has to add categories first.</div>';
-  var groups = H.catGroups();
-  function catFields(cur) {
-    var g = groups.filter(function (x) { return x.subs.some(function (o) { return o[0] === cur; }); })[0] || groups[0];
-    var only = g.subs.length === 1 && g.subs[0][0] === g.id;
-    return H.sel("Category", "pf_c0", groups.map(function (x) { return [x.id, x.name]; }), g.id) +
-      '<label class="field" id="pf_cw"' + (only ? ' hidden' : '') + '><span>Sub category</span><select class="inp" id="pf_c">' + H.subOpts(g, cur) + "</select></label>";
-  }
   function form(p) {
     formAttrs = p.attributes || {};
-    return H.fld("Title", "pf_t", p.title, 'maxlength="150"') + H.area("Description", "pf_d", p.description, 'maxlength="5000"') + H.sel("Gender", "pf_gd", [["", "Not gender specific"], ["women", "Women"], ["men", "Men"], ["girls", "Girls"], ["boys", "Boys"]], formAttrs.gender || "") + catFields(p.categoryId) + H.sel("Brand", "pf_b", brands, p.brandId || "") + H.sel("Condition", "pf_n", conds, p.condition || "good") +
+    return H.fld("Title", "pf_t", p.title, 'maxlength="150"') + H.area("Description", "pf_d", p.description, 'maxlength="5000"') + H.sel("Gender", "pf_gd", [["", "Not gender specific"], ["women", "Women"], ["men", "Men"], ["girls", "Girls"], ["boys", "Boys"]], formAttrs.gender || "") + H.sel("Category", "pf_c", cats, p.categoryId || (cats[0] ? cats[0][0] : "")) + H.sel("Brand", "pf_b", brands, p.brandId || "") + H.sel("Condition", "pf_n", conds, p.condition || "good") +
       H.sel("GST rate", "pf_g", gst, p.gstRateBp != null ? p.gstRateBp : (gst[0] ? gst[0][0] : 0)) + H.fld("HSN code (optional)", "pf_h", p.hsnCode || "", 'inputmode="numeric" maxlength="8"');
   }
   if (isNew) return head("New product", true) + '<form id="pfn" novalidate>' + form({}) + '<p class="bad small" id="pferr"></p><button class="btn block" type="submit">Save and continue</button></form><p class="muted small">Next you add photos, sizes, prices and stock.</p>';

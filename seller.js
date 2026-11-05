@@ -326,7 +326,13 @@ V.slprod = function (id) {
       H.fld("Item code (optional)", "nv_s", "", 'maxlength="40" autocomplete="off" autocapitalize="characters" placeholder="e.g. JKT-01"') + '<p class="muted small" style="margin:0 0 10px">Your own code to find this item in your stock. Buyers never see it. Leave it empty and we make one for you.</p>' + '<div class="two">' + H.fld("Price (₹)", "nv_p", "", 'inputmode="decimal"') + H.fld("MRP (₹)", "nv_m", "", 'inputmode="decimal"') + "</div>" + H.fld("How many do you have?", "nv_q", "1", 'inputmode="numeric"') + '<button class="btn block" data-a="sladdv" data-i="' + esc(p.id) + '">Add size and price</button></div></details>';
   // details
   if (locked) out += '<h3 style="margin:14px 0 6px">Details</h3><div class="list"><div class="row" style="display:block">' + esc(p.categoryPath || p.categoryName) + " · " + esc(R.COND[p.condition] || p.condition) + "<br>" + esc(p.description || "") + "</div></div>";
-  else out += '<h3 style="margin:14px 0 6px">Details</h3><form id="pfe" data-id="' + esc(p.id) + '" novalidate>' + form(p) + '<p class="bad small" id="pferr"></p><button class="btn ghost block" type="submit">Save details</button></form>';
+  else {
+    // Already filled in on the first screen, so show a short summary; the full form opens only when the seller wants to change something.
+    var GEN = { women: "Women", men: "Men", girls: "Girls", boys: "Boys" }, gd = p.attributes && GEN[p.attributes.gender];
+    out += '<h3 style="margin:14px 0 6px">Details</h3><details class="list"><summary class="row" style="cursor:pointer;display:block"><b>' + esc(p.title) + '</b><br><span class="muted small">' +
+      esc([p.categoryName || p.categoryPath, gd, R.COND[p.condition] || p.condition].filter(Boolean).join(" · ")) + '</span><br><span class="small" style="color:var(--accent,inherit)">Edit details</span></summary>' +
+      '<div style="padding:0 14px 14px"><form id="pfe" data-id="' + esc(p.id) + '" novalidate>' + form(p) + '<p class="bad small" id="pferr"></p><button class="btn ghost block" type="submit">Save details</button></form></div></details>';
+  }
   // actions
   out += '<div style="margin-top:16px;display:grid;gap:8px"><p class="bad small" id="slaerr"></p>';
   if (p.status === "draft" || p.status === "rejected") out += '<button class="btn block" data-a="slpact" data-i="' + esc(p.id) + '" data-j="submit">Submit for review</button>';

@@ -365,8 +365,10 @@ document.addEventListener("submit", async function (ev) {
 });
 A.slimgdel = async function (pid, iid) { await api.del("/seller/products/" + pid + "/images/" + iid); drop("sl:prod:" + pid); R.render(); };
 A.slpact = async function (pid, act) {
+  // A size typed into the "Add size and price" form but not added yet: add it first, so the seller does not lose it.
+  if (act === "submit" && $("nv_p") && (val("nv_o") || val("nv_p"))) { if (!(await A.sladdv(pid))) return; }
   try { await api.post("/seller/products/" + pid + "/" + act, {}); drop("sl:prod:" + pid); drop("sl:prods"); toast({ submit: "Sent for review", withdraw: "Withdrawn", archive: "Archived", unarchive: "Back on sale (in review if needed)" }[act]); R.render(); }
-  catch (e) { var er = $("slaerr"), m = errText(e); if (e.code === "PRODUCT_INCOMPLETE" && e.details && e.details.length) m = e.details.map(function (d) { return d.message; }).join(" "); if (er) er.textContent = m; else toast(m); }
+  catch (e) { var er = $("slaerr"), m = errText(e); if (e.code === "PRODUCT_INCOMPLETE" && e.details && e.details.length) m = e.details.map(function (d) { return d.path === "variants" ? "Add a size and price first: fill in the form above and tap Add size and price." : d.message; }).join(" "); if (er) er.textContent = m; else toast(m); }
 };
 A.sldiscard = async function (pid) { await api.del("/seller/products/" + pid + "/pending-change"); drop("sl:prod:" + pid); drop("sl:prods"); toast("Edit discarded"); R.render(); };
 A.slpdel = async function (pid) { if (!tapTwice("del" + pid)) return; await api.del("/seller/products/" + pid); drop("sl:prod"); drop("sl:prods"); toast("Deleted"); R.back(); };
@@ -387,16 +389,16 @@ A.slvsave = async function (pid, vid) {
 A.slsz = function (z) { var e = $("nv_o"); if (e) { e.value = z; e.focus(); } };
 A.sladdv = async function (pid) {
   var name = val("nv_o"), sku = val("nv_s"), price = H.paise("nv_p"), mrp = H.paise("nv_m"), q = parseInt(val("nv_q"), 10);
-  if (!name) return toast("Enter a size or option, for example M, or tap One size.");
+  if (!name) { toast("Enter a size or option, for example M, or tap One size."); return false; }
   if (!sku) sku = (pid.slice(0, 4) + "-" + name).replace(/[^A-Za-z0-9._-]/g, "").toUpperCase();
-  if (!(price >= 100)) return toast("Enter a price of at least ₹1.");
+  if (!(price >= 100)) { toast("Enter a price of at least ₹1."); return false; }
   if (isNaN(mrp)) mrp = price;
-  if (mrp < price) return toast("MRP cannot be lower than the price.");
+  if (mrp < price) { toast("MRP cannot be lower than the price."); return false; }
   try {
     var r = await api.post("/seller/products/" + pid + "/variants", { sku: sku, options: { size: name }, pricePaise: price, mrpPaise: mrp });
     if (q > 0) await api.put("/seller/inventory/" + r.id, { onHand: q, expectedOnHand: 0 });
-    drop("sl:prod:" + pid); drop("sl:inv:" + pid); drop("sl:prods"); toast("Option added"); R.render();
-  } catch (e) { toast(errText(e)); }
+    drop("sl:prod:" + pid); drop("sl:inv:" + pid); drop("sl:prods"); toast("Size added"); R.render(); return true;
+  } catch (e) { toast(errText(e)); return false; }
 };
 
 /* ---------- orders ---------- */

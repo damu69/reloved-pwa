@@ -48,6 +48,28 @@ H.catPair = function (base, label, cur, allowTop, firstLabel) {
   return H.sel(label, base + "0", topOpts, topId, 'data-pair="' + base + '" data-first="' + esc(firstLabel) + '"') +
     '<label class="field" id="' + base + 'w"' + (topId ? "" : " hidden") + '><span>Sub category</span><select class="inp" id="' + base + '">' + H.catPairOpts(topId, cur || topId, firstLabel) + "</select></label>";
 };
+// Category dropdown grouped by the chosen Gender: that gender's clothing first, then accessories, bags, shoes and the rest.
+// Categories are matched by slug, so a category the admin adds later lands in the second group.
+var CLOTHES = {
+  women: ["dresses", "kurtas", "sarees", "tops", "jeans", "jackets"],
+  men: ["shirts", "tshirts", "jeans", "jackets"],
+  girls: ["kids-clothing"], boys: ["kids-clothing"]
+};
+var CLOTHES_LABEL = { women: "Women's clothing", men: "Men's clothing", girls: "Kids clothing", boys: "Kids clothing" };
+H.catOpts = function (gender, cur, pin) {
+  var all = {}; Object.keys(CLOTHES).forEach(function (g) { CLOTHES[g].forEach(function (x) { all[x] = 1; }); });
+  var cats = S.cats.filter(function (c) { return c.is_active !== false && !S.cats.some(function (d) { return d.parentId === c.id; }); })
+    .sort(function (a, b) { return a.name < b.name ? -1 : 1; });
+  var mine = gender ? CLOTHES[gender] || [] : Object.keys(all);
+  var clothes = cats.filter(function (c) { return mine.indexOf(c.slug || c.path) > -1; });
+  var rest = cats.filter(function (c) { return !all[c.slug || c.path]; });
+  // Keep the product's current category visible even if it does not match the gender.
+  var curC = cats.filter(function (c) { return c.id === cur; })[0];
+  if (pin && curC && clothes.indexOf(curC) < 0 && rest.indexOf(curC) < 0) clothes.unshift(curC);
+  function o(c) { return '<option value="' + esc(c.id) + '"' + (c.id === cur ? " selected" : "") + ">" + esc(c.name) + "</option>"; }
+  return (clothes.length ? '<optgroup label="' + esc(gender ? CLOTHES_LABEL[gender] : "Clothing") + '">' + clothes.map(o).join("") + "</optgroup>" : "") +
+    (rest.length ? '<optgroup label="Accessories, bags, shoes and more">' + rest.map(o).join("") + "</optgroup>" : "");
+};
 H.allCats = function () {
   var byId = {}; S.cats.forEach(function (c) { byId[c.id] = c; });
   function label(c) { var parts = [], x = c; while (x) { parts.unshift(x.name); x = x.parentId ? byId[x.parentId] : null; } return parts.join(" › "); }
@@ -203,6 +225,10 @@ document.addEventListener("change", async function (ev) {
     if (wr) wr.hidden = !ev.target.value;
     return;
   }
+  if (ev.target && ev.target.id === "pf_gd") {
+    var cs = $("pf_c"); if (cs) { var keep = cs.value; cs.innerHTML = H.catOpts(ev.target.value, keep); }
+    return;
+  }
   if (ev.target && ev.target.id === "pf_c0") {
     var g0 = H.catGroups().filter(function (x) { return x.id === ev.target.value; })[0], sel = $("pf_c"), w = $("pf_cw");
     if (g0 && sel) { sel.innerHTML = H.subOpts(g0, ""); if (w) w.hidden = g0.subs.length === 1 && g0.subs[0][0] === g0.id; }
@@ -296,7 +322,7 @@ V.slprod = function (id) {
   if (isNew && !cats.length) return head("New product", true) + '<div class="empty"><h2>No categories yet</h2>The marketplace admin has to add categories first.</div>';
   function form(p) {
     formAttrs = p.attributes || {};
-    return H.fld("Title", "pf_t", p.title, 'maxlength="150"') + H.area("Description", "pf_d", p.description, 'maxlength="5000"') + H.sel("Gender", "pf_gd", [["", "Not gender specific"], ["women", "Women"], ["men", "Men"], ["girls", "Girls"], ["boys", "Boys"]], formAttrs.gender || "") + H.sel("Category", "pf_c", cats, p.categoryId || (cats[0] ? cats[0][0] : "")) + H.sel("Brand", "pf_b", brands, p.brandId || "") + H.sel("Condition", "pf_n", conds, p.condition || "good") +
+    return H.fld("Title", "pf_t", p.title, 'maxlength="150"') + H.area("Description", "pf_d", p.description, 'maxlength="5000"') + H.sel("Gender", "pf_gd", [["", "Not gender specific"], ["women", "Women"], ["men", "Men"], ["girls", "Girls"], ["boys", "Boys"]], formAttrs.gender || "") + '<label class="field"><span>Category</span><select class="inp" id="pf_c">' + H.catOpts(formAttrs.gender || "", p.categoryId || "", true) + "</select></label>" + H.sel("Brand", "pf_b", brands, p.brandId || "") + H.sel("Condition", "pf_n", conds, p.condition || "good") +
       H.sel("GST rate", "pf_g", gst, p.gstRateBp != null ? p.gstRateBp : (gst[0] ? gst[0][0] : 0)) + H.fld("HSN code (optional)", "pf_h", p.hsnCode || "", 'inputmode="numeric" maxlength="8"');
   }
   if (isNew) return head("New product", true) + '<form id="pfn" novalidate>' + form({}) + '<p class="bad small" id="pferr"></p><button class="btn block" type="submit">Save and continue</button></form><p class="muted small">Next you add photos, sizes, prices and stock.</p>';

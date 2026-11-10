@@ -287,6 +287,21 @@ function tapTwice(id) {
   return false;
 }
 H.tapTwice = tapTwice;
+// Confirmation pop-up. Resolves true when the seller presses the action button, false on Cancel, tapping outside or Escape.
+H.ask = function (title, text, okLabel) {
+  return new Promise(function (done) {
+    var wrap = document.createElement("div");
+    wrap.innerHTML = '<div class="scrim"></div><div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="askt"><h3 id="askt" style="margin:0 0 6px">' + esc(title) + '</h3>' +
+      (text ? '<p class="muted small" style="margin:0 0 14px">' + esc(text) + "</p>" : "") +
+      '<div class="two"><button type="button" class="btn ghost" data-ask="0">Cancel</button><button type="button" class="btn danger" data-ask="1">' + esc(okLabel || "Confirm") + "</button></div></div>";
+    function close(v) { document.removeEventListener("keydown", key); wrap.remove(); done(v); }
+    function key(e) { if (e.key === "Escape") close(false); }
+    wrap.addEventListener("click", function (e) { var b = e.target.closest("[data-ask]"); if (b) close(b.getAttribute("data-ask") === "1"); else if (e.target.classList.contains("scrim")) close(false); });
+    document.addEventListener("keydown", key);
+    document.body.appendChild(wrap);
+    var ok = wrap.querySelector('[data-ask="1"]'); if (ok) ok.focus();
+  });
+};
 function more(c, act) { return c && c.data && c.data.nextCursor ? '<button class="btn ghost block" data-a="' + act + '">Load more</button>' : ""; }
 var refs = function () {
   return { b: need("sl:brands", function () { return api.get("/catalogue/brands"); }), g: need("sl:gst", function () { return api.get("/catalogue/gst-rates"); }) };
@@ -397,8 +412,8 @@ A.slpact = async function (pid, act) {
   catch (e) { var er = $("slaerr"), m = errText(e); if (e.code === "PRODUCT_INCOMPLETE" && e.details && e.details.length) m = e.details.map(function (d) { return d.path === "variants" ? "Add a size and price first: fill in the form above and tap Add size and price." : d.message; }).join(" "); if (er) er.textContent = m; else toast(m); }
 };
 A.sldiscard = async function (pid) { await api.del("/seller/products/" + pid + "/pending-change"); drop("sl:prod:" + pid); drop("sl:prods"); toast("Edit discarded"); R.render(); };
-A.slpdel = async function (pid) { if (!tapTwice("del" + pid)) return; await api.del("/seller/products/" + pid); drop("sl:prod"); drop("sl:prods"); toast("Deleted"); R.back(); };
-A.slvdel = async function (pid, vid) { if (!tapTwice(vid)) return; await api.del("/seller/products/" + pid + "/variants/" + vid); drop("sl:prod:" + pid); drop("sl:inv:" + pid); R.render(); };
+A.slpdel = async function (pid) { if (!(await H.ask("Delete this product?", "Its photos, sizes and stock are removed too. This cannot be undone.", "Delete"))) return; await api.del("/seller/products/" + pid); drop("sl:prod"); drop("sl:prods"); toast("Deleted"); R.back(); };
+A.slvdel = async function (pid, vid) { if (!(await H.ask("Remove this size?", "Its price and stock are removed from the listing.", "Remove"))) return; await api.del("/seller/products/" + pid + "/variants/" + vid); drop("sl:prod:" + pid); drop("sl:inv:" + pid); R.render(); };
 A.slvsave = async function (pid, vid) {
   var price = H.paise("vp_" + vid), mrp = H.paise("vm_" + vid), q = parseInt(val("vs_" + vid), 10);
   if (!(price >= 100)) return toast("Enter a price of at least ₹1.");
@@ -470,7 +485,7 @@ A.sostep = async function (id, to) {
 A.socancel = async function (id) {
   var r = val("so_r"), er = $("soerr");
   if (r.length < 5) { if (er) er.textContent = "Give a reason of at least 5 characters."; return; }
-  if (!tapTwice("c" + id)) return;
+  if (!(await H.ask("Cancel this order?", "The buyer gets a full refund. This cannot be undone.", "Cancel order"))) return;
   try { await api.post("/seller/orders/" + id + "/cancel", { reason: r, restock: !!($("so_rs") && $("so_rs").checked) }); drop("sl:"); toast("Cancelled. The buyer will be refunded."); R.render(); }
   catch (e) { if (er) er.textContent = errText(e); else toast(errText(e)); }
 };

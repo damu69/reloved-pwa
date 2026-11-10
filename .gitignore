@@ -7,3 +7,9 @@ e2e/playwright-report/
 .env
 .env.*
 !.env.example
+
+# Impeccable design skill (local tooling, includes a 23 MB engine binary)
+.claude/
+.github/agents/
+.github/hooks/
+.github/skills/

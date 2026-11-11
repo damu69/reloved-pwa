@@ -18,6 +18,12 @@
     Array.prototype.forEach.call(d.children, function (el, n) { el.classList.toggle("on", n === i); });
   }
   document.addEventListener("scroll", function (e) { if (e.target && e.target.id === "herotrack") dots(); }, true);
+  // item page photos: keep the "2 / 5" counter in step with the swipe
+  document.addEventListener("scroll", function (e) {
+    var g = e.target; if (!g || g.id !== "igal") return;
+    var c = document.getElementById("igcount"); if (!c || !g.clientWidth) return;
+    c.textContent = (Math.round(g.scrollLeft / g.clientWidth) + 1) + " / " + g.getAttribute("data-n");
+  }, true);
   document.addEventListener("click", function (e) {
     var h = e.target.closest && e.target.closest("[data-hero]"), r = e.target.closest && e.target.closest("[data-rail]");
     if (h) {

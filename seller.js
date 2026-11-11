@@ -106,7 +106,7 @@ R.hooks.push(function () {
     api.blob(p).then(function (b) { blobCache[p] = URL.createObjectURL(b); img.src = blobCache[p]; }, function () { img.remove(); });
   });
 });
-H.thumb = function (title, path) { var h = R.hueOf(title); return '<div class="ph" style="background:linear-gradient(150deg,hsl(' + h + ',38%,38%),hsl(' + ((h + 30) % 360) + ',42%,20%))">' + esc(String(title || "?").slice(0, 2).toUpperCase()) + (path ? H.authImg(path) : "") + "</div>"; };
+H.thumb = function (title, path) { return '<div class="ph" style="background:var(--surface2)">' + esc(String(title || "?").slice(0, 2).toUpperCase()) + (path ? H.authImg(path) : "") + "</div>"; };
 
 var APP_ST = { draft: "Draft", submitted: "Under review", approved: "Approved", changes_requested: "Changes requested", rejected: "Rejected", suspended: "Suspended" };
 var DOC_LABEL = { pan_card: "PAN card", gst_certificate: "GST certificate", address_proof: "Address proof (Aadhaar, utility bill, rent agreement…)", bank_proof: "Bank proof (cancelled cheque or statement)", other: "Other" };
@@ -337,28 +337,41 @@ V.slprod = function (id) {
   if (isNew && !cats.length) return head("New product", true) + '<div class="empty"><h2>No categories yet</h2>The marketplace admin has to add categories first.</div>';
   function form(p) {
     formAttrs = p.attributes || {};
-    return H.fld("Title", "pf_t", p.title, 'maxlength="150"') + H.area("Description", "pf_d", p.description, 'maxlength="5000"') + H.sel("Gender", "pf_gd", [["", "Not gender specific"], ["women", "Women"], ["men", "Men"], ["girls", "Girls"], ["boys", "Boys"]], formAttrs.gender || "") + '<label class="field"><span>Category</span><select class="inp" id="pf_c">' + H.catOpts(formAttrs.gender || "", p.categoryId || "", true) + "</select></label>" + H.sel("Brand", "pf_b", brands, p.brandId || "") + H.sel("Condition", "pf_n", conds, p.condition || "good") +
-      H.sel("GST rate", "pf_g", gst, p.gstRateBp != null ? p.gstRateBp : (gst[0] ? gst[0][0] : 0)) + H.fld("HSN code (optional)", "pf_h", p.hsnCode || "", 'inputmode="numeric" maxlength="8"');
+    var gcur = p.gstRateBp != null ? p.gstRateBp : (gst[0] ? gst[0][0] : 0), glab = (gst.filter(function (g) { return String(g[0]) === String(gcur); })[0] || [0, ""])[1];
+    return '<div class="sl-group"><h4>About the item</h4>' + H.fld("Title", "pf_t", p.title, 'maxlength="150" placeholder="e.g. Blue Levis 511 jeans, waist 32"') + H.area("Description", "pf_d", p.description, 'maxlength="5000" placeholder="Fit, flaws, how often worn, measurements"') + "</div>" +
+      '<div class="sl-group"><h4>Category and condition</h4><div class="two">' + H.sel("Gender", "pf_gd", [["", "Not specific"], ["women", "Women"], ["men", "Men"], ["girls", "Girls"], ["boys", "Boys"]], formAttrs.gender || "") + '<label class="field"><span>Category</span><select class="inp" id="pf_c">' + H.catOpts(formAttrs.gender || "", p.categoryId || "", true) + "</select></label></div>" +
+      '<div class="two">' + H.sel("Brand", "pf_b", brands, p.brandId || "") + H.sel("Condition", "pf_n", conds, p.condition || "good") + "</div></div>" +
+      '<details class="sl-more"><summary>Tax details <span class="muted small">GST ' + esc(glab) + "</span></summary>" + H.sel("GST rate", "pf_g", gst, gcur) + H.fld("HSN code (optional)", "pf_h", p.hsnCode || "", 'inputmode="numeric" maxlength="8"') + "</details>";
   }
-  if (isNew) return head("New product", true) + '<form id="pfn" novalidate>' + form({}) + '<p class="bad small" id="pferr"></p><button class="btn block" type="submit">Save and continue</button></form><p class="muted small">Next you add photos, sizes, prices and stock.</p>';
+  if (isNew) return head("List an item", true) + stepsBar([true, false, false], 0) + '<form id="pfn" class="sl-form" novalidate>' + form({}) + '<p class="bad small" id="pferr"></p><div class="sl-actions"><button class="btn block" type="submit">Continue to photos</button></div></form>';
   var L = loadProd(id), c = L.p;
   if (c.st === "loading") return head("Product", true) + R.loadingBox();
   if (c.st === "err") return head("Product", true) + R.failBox(c.err);
   var p = c.data, st = P_ST[p.status] || [p.status, ""], locked = !(p.status === "draft" || p.status === "rejected" || p.status === "active");
-  var out = head(esc(p.title), true) + "<p>" + H.pill(st[0], st[1]) + (p.pendingChange ? " " + H.pill("Edit in review", "prog") : "") + "</p>";
+  var out = head(esc(p.title), true) + '<p class="sl-status">' + H.pill(st[0], st[1]) + (p.pendingChange ? " " + H.pill("Edit in review", "prog") : "") + "</p>" + (locked ? "" : stepsBar([true, p.images.length > 0, p.variants.length > 0], -1));
   if (p.status === "rejected" && p.reviewNote) out += '<div class="banner warn"><b>Rejected</b><span class="small">' + esc(p.reviewNote) + "</span></div>";
   if (p.lastChangeReview && p.lastChangeReview.status === "rejected") out += '<div class="banner warn"><b>Your last edit was not approved</b><span class="small">' + esc(p.lastChangeReview.note || "") + "</span></div>";
   if (p.status === "pending") out += '<div class="banner"><b>In review</b><span class="small muted">We are checking this item. You can withdraw it to make changes.</span></div>';
   if (p.status === "blocked") out += '<div class="banner warn"><b>Blocked</b><span class="small">' + esc(p.reviewNote || "This item was blocked by the marketplace.") + "</span></div>";
   if (p.status === "active") out += '<div class="banner"><span class="small muted">Price and stock changes apply at once. Changes to the title, description, photos or category are reviewed first.</span></div>';
+  // details (filled in on the first screen), then photos, then sizes: the same order as the steps bar
+  out += cardHead(1, "Details", true, "");
+  if (locked) out += '<div class="list"><div class="row" style="display:block">' + esc(p.categoryPath || p.categoryName) + " · " + esc(R.COND[p.condition] || p.condition) + "<br>" + esc(p.description || "") + "</div></div>";
+  else {
+    // Already filled in on the first screen, so show a short summary; the full form opens only when the seller wants to change something.
+    var GEN = { women: "Women", men: "Men", girls: "Girls", boys: "Boys" }, gd = p.attributes && GEN[p.attributes.gender];
+    out += '<details class="list"><summary class="row" style="cursor:pointer;display:block"><b>' + esc(p.title) + '</b><br><span class="muted small">' +
+      esc([p.categoryName || p.categoryPath, gd, R.COND[p.condition] || p.condition].filter(Boolean).join(" · ")) + '</span><br><span class="small" style="color:var(--accent,inherit)">Edit details</span></summary>' +
+      '<div style="padding:0 14px 14px"><form id="pfe" data-id="' + esc(p.id) + '" novalidate>' + form(p) + '<p class="bad small" id="pferr"></p><button class="btn ghost block" type="submit">Save details</button></form></div></details>';
+  }
+  out += "</section>";
   // photos
-  out += '<h3 style="margin:14px 0 6px">Photos</h3><div class="thumbs">' + p.images.map(function (im) {
+  out += cardHead(2, "Photos", p.images.length > 0, p.images.length ? p.images.length + " added. The first photo is the cover." : "Clear photos in daylight sell faster. Show the front, back, label and any flaws.") + '<div class="thumbs slthumbs">' + p.images.map(function (im) {
     return '<div style="position:relative">' + H.thumb("", "/seller/products/" + p.id + "/images/" + im.id + "/200") + (locked ? "" : '<button class="heart" style="right:2px;top:2px;bottom:auto" data-a="slimgdel" data-i="' + esc(p.id) + '" data-j="' + esc(im.id) + '" aria-label="Remove photo"><span style="color:#141210;font-weight:700;font-size:1.1rem;line-height:1">×</span></button>') + (im.status !== "active" ? '<span class="tag" style="position:absolute;left:2px;bottom:2px;background:rgba(0,0,0,.7);color:#fff;font-size:.6rem;padding:2px 5px;border-radius:6px">' + (im.status === "pending_remove" ? "removing" : "in review") + "</span>" : "") + "</div>";
-  }).join("") + "</div>" + (!locked && staged && staged.pid === p.id ? '<div class="banner"><b>Add ' + staged.files.length + " photo" + (staged.files.length > 1 ? "s" : "") + '?</b><span class="small muted">Only these photos will be uploaded. Remove any you did not mean to pick.</span></div><div class="thumbs">' + staged.urls.map(function (u, k) { return '<div style="position:relative"><button type="button" class="ph" data-a="slimgview" data-i="' + k + '" aria-label="Preview photo ' + (k + 1) + '" style="padding:0;border:0;overflow:hidden;cursor:zoom-in"><img src="' + u + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></button><button class="heart" style="right:2px;top:2px;bottom:auto" data-a="slimgrm" data-i="' + esc(p.id) + '" data-j="' + k + '" aria-label="Remove from selection"><span style="color:#141210;font-weight:700;font-size:1.1rem;line-height:1">×</span></button></div>'; }).join("") + '</div><p class="muted small" style="margin:-6px 0 10px">Tap a photo to see it bigger.</p><div>' + (staged.view != null && staged.urls[staged.view] ? '<div role="dialog" aria-modal="true" aria-label="Photo preview" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.92);display:flex;flex-direction:column;padding:16px"><img src="' + staged.urls[staged.view] + '" alt="" style="flex:1;min-height:0;width:100%;object-fit:contain"><div class="two" style="margin-top:12px"><button class="btn danger" data-a="slimgrm" data-i="' + esc(p.id) + '" data-j="' + staged.view + '">Remove</button><button class="btn" data-a="slimgclose">Close</button></div></div>' : "") + '</div><button class="btn block" data-a="slimgok" data-i="' + esc(p.id) + '">Upload ' + staged.files.length + '</button><button class="btn ghost block" data-a="slimgno">Cancel</button>' : "") + (locked ? "" : '<label class="upl">+ Add photos<input type="file" data-img="' + esc(p.id) + '" accept="image/jpeg,image/png,image/webp" multiple hidden></label>');
+  }).join("") + "</div>" + (!locked && staged && staged.pid === p.id ? '<div class="banner"><b>Add ' + staged.files.length + " photo" + (staged.files.length > 1 ? "s" : "") + '?</b><span class="small muted">Only these photos will be uploaded. Remove any you did not mean to pick.</span></div><div class="thumbs">' + staged.urls.map(function (u, k) { return '<div style="position:relative"><button type="button" class="ph" data-a="slimgview" data-i="' + k + '" aria-label="Preview photo ' + (k + 1) + '" style="padding:0;border:0;overflow:hidden;cursor:zoom-in"><img src="' + u + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block"></button><button class="heart" style="right:2px;top:2px;bottom:auto" data-a="slimgrm" data-i="' + esc(p.id) + '" data-j="' + k + '" aria-label="Remove from selection"><span style="color:#141210;font-weight:700;font-size:1.1rem;line-height:1">×</span></button></div>'; }).join("") + '</div><p class="muted small" style="margin:-6px 0 10px">Tap a photo to see it bigger.</p><div>' + (staged.view != null && staged.urls[staged.view] ? '<div role="dialog" aria-modal="true" aria-label="Photo preview" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.92);display:flex;flex-direction:column;padding:16px"><img src="' + staged.urls[staged.view] + '" alt="" style="flex:1;min-height:0;width:100%;object-fit:contain"><div class="two" style="margin-top:12px"><button class="btn danger" data-a="slimgrm" data-i="' + esc(p.id) + '" data-j="' + staged.view + '">Remove</button><button class="btn" data-a="slimgclose">Close</button></div></div>' : "") + '</div><button class="btn block" data-a="slimgok" data-i="' + esc(p.id) + '">Upload ' + staged.files.length + '</button><button class="btn ghost block" data-a="slimgno">Cancel</button>' : "") + (locked ? "" : '<label class="upl">' + (p.images.length ? "+ Add more photos" : "+ Add photos") + '<input type="file" data-img="' + esc(p.id) + '" accept="image/jpeg,image/png,image/webp" multiple hidden></label>') + "</section>";
   // variants
   var inv = L.inv.data ? L.inv.data.items : [], lvl = {}; inv.forEach(function (x) { lvl[x.variantId] = x; });
-  out += '<h3 style="margin:14px 0 6px">Sizes, prices and stock</h3>';
-  if (!p.variants.length) out += '<p class="muted small">Add at least one size with a price. For a single item, choose One size.</p>';
+  out += cardHead(3, "Size and price", p.variants.length > 0, p.variants.length ? "Tap a size to change its price or stock." : "Add at least one size with a price. Selling a single item? Choose One size.");
   p.variants.forEach(function (v) {
     var l = lvl[v.id], label = Object.keys(v.options || {}).map(function (k) { return v.options[k]; }).join(" / ") || v.sku;
     // Saved sizes show as one short line; the price and stock fields open only when the seller taps Edit.
@@ -368,26 +381,27 @@ V.slprod = function (id) {
   });
   if (!locked) out += '<details class="list" ' + (p.variants.length ? "" : "open") + '><summary class="row" style="cursor:pointer"><span class="l"><b>' + (p.variants.length ? "+ Add another size" : "+ Add size and price") + '</b></span></summary><div style="padding:0 14px 14px">' + H.fld("Size or option", "nv_o", "", 'maxlength="40" autocomplete="off" placeholder="e.g. M, EU 41, Red"') + '<div class="chips" style="margin:-4px 0 4px">' + ["One size", "XS", "S", "M", "L", "XL", "XXL"].map(function (z) { return '<button type="button" class="chip" data-a="slsz" data-i="' + z + '">' + z + "</button>"; }).join("") + '</div><p class="muted small" style="margin:0 0 10px">What the buyer picks. Selling a single item? Tap One size. Each size is added once; tap a saved size above to change its price or stock.</p>' +
       H.fld("Item code (optional)", "nv_s", "", 'maxlength="40" autocomplete="off" autocapitalize="characters" placeholder="e.g. JKT-01"') + '<p class="muted small" style="margin:0 0 10px">Your own code to find this item in your stock. Buyers never see it. Leave it empty and we make one for you.</p>' + '<div class="two">' + H.fld("Price (₹)", "nv_p", "", 'inputmode="decimal"') + H.fld("MRP (₹)", "nv_m", "", 'inputmode="decimal"') + "</div>" + H.fld("How many do you have?", "nv_q", "1", 'inputmode="numeric"') + '<button class="btn block" data-a="sladdv" data-i="' + esc(p.id) + '">Add size and price</button></div></details>';
+  out += "</section>";
   // details
-  if (locked) out += '<h3 style="margin:14px 0 6px">Details</h3><div class="list"><div class="row" style="display:block">' + esc(p.categoryPath || p.categoryName) + " · " + esc(R.COND[p.condition] || p.condition) + "<br>" + esc(p.description || "") + "</div></div>";
-  else {
-    // Already filled in on the first screen, so show a short summary; the full form opens only when the seller wants to change something.
-    var GEN = { women: "Women", men: "Men", girls: "Girls", boys: "Boys" }, gd = p.attributes && GEN[p.attributes.gender];
-    out += '<h3 style="margin:14px 0 6px">Details</h3><details class="list"><summary class="row" style="cursor:pointer;display:block"><b>' + esc(p.title) + '</b><br><span class="muted small">' +
-      esc([p.categoryName || p.categoryPath, gd, R.COND[p.condition] || p.condition].filter(Boolean).join(" · ")) + '</span><br><span class="small" style="color:var(--accent,inherit)">Edit details</span></summary>' +
-      '<div style="padding:0 14px 14px"><form id="pfe" data-id="' + esc(p.id) + '" novalidate>' + form(p) + '<p class="bad small" id="pferr"></p><button class="btn ghost block" type="submit">Save details</button></form></div></details>';
-  }
   // actions
-  out += '<div style="margin-top:16px;display:grid;gap:8px"><p class="bad small" id="slaerr"></p>';
+  out += '<div class="sl-actions"><p class="bad small" id="slaerr"></p>';
   if (p.status === "draft" || p.status === "rejected") out += '<button class="btn block" data-a="slpact" data-i="' + esc(p.id) + '" data-j="submit">Submit for review</button>';
   if (p.status === "pending") out += '<button class="btn ghost block" data-a="slpact" data-i="' + esc(p.id) + '" data-j="withdraw">Withdraw from review</button>';
   if (p.status === "active") out += '<button class="btn ghost block" data-a="slpact" data-i="' + esc(p.id) + '" data-j="archive">Archive (hide from buyers)</button>';
   if (p.status === "archived") out += '<button class="btn block" data-a="slpact" data-i="' + esc(p.id) + '" data-j="unarchive">Bring back</button>';
   if (p.pendingChange) out += '<button class="btn ghost block" data-a="sldiscard" data-i="' + esc(p.id) + '">Discard my edit in review</button>';
-  if (p.status === "draft" || p.status === "rejected") out += '<button class="btn danger block" data-a="slpdel" data-i="' + esc(p.id) + '">' + (R.UI.confirm === "del" + p.id ? "Tap again to delete" : "Delete product") + "</button>";
-  return out + "</div>";
+  out += "</div>";
+  if (p.status === "draft" || p.status === "rejected") out += '<p class="sl-danger"><button data-a="slpdel" data-i="' + esc(p.id) + '">Delete this listing</button></p>';
+  return out;
 };
 var formAttrs = {};
+// Listing progress: Details, Photos, Size and price. `cur` marks the step on screen (-1: all on one page).
+function stepsBar(done, cur) {
+  return '<ol class="sl-steps">' + ["Details", "Photos", "Size and price"].map(function (t, k) { return '<li class="' + (done[k] ? "done" : "") + (k === cur ? " cur" : "") + '"><i>' + (done[k] && k !== cur ? "✓" : k + 1) + "</i>" + t + "</li>"; }).join("") + "</ol>";
+}
+function cardHead(n, title, done, sub) {
+  return '<section class="sl-card"><div class="sl-h"><i class="sl-n' + (done ? " done" : "") + '">' + (done ? "✓" : n) + "</i><h3>" + title + "</h3></div>" + (sub ? '<p class="sl-sub">' + sub + "</p>" : "");
+}
 function productBody() {
   var b = { title: val("pf_t"), description: val("pf_d"), categoryId: val("pf_c"), condition: val("pf_n"), gstRateBp: parseInt(val("pf_g"), 10), brandId: val("pf_b") || null, hsnCode: val("pf_h") || null };
   var at = Object.assign({}, formAttrs), g = val("pf_gd"); // keep other attributes (such as colour), set or clear gender

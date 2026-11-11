@@ -288,7 +288,7 @@ function tapTwice(id) {
 }
 H.tapTwice = tapTwice;
 // Confirmation pop-up. Resolves true when the seller presses the action button, false on Cancel, tapping outside or Escape.
-H.ask = function (title, text, okLabel) {
+H.ask = R.ask || function (title, text, okLabel) {
   return new Promise(function (done) {
     var wrap = document.createElement("div");
     wrap.innerHTML = '<div class="scrim"></div><div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="askt"><h3 id="askt" style="margin:0 0 6px">' + esc(title) + '</h3>' +
@@ -486,7 +486,7 @@ V.slorder = function (id) {
   if (nx && pk.status === "processing" && pk.delivery.code !== "meet") out += H.fld("Courier name", "so_car", "", 'maxlength="60"') + H.fld("Tracking number", "so_trk", "", 'maxlength="60"');
   if (nx) out += '<button class="btn block" data-a="sostep" data-i="' + esc(pk.id) + '" data-j="' + nx[0] + '">' + nx[1] + "</button>";
   if (pk.delivery.code === "meet" && (pk.status === "confirmed" || pk.status === "processing")) out += '<button class="btn ghost block" style="margin-top:8px" data-a="sostep" data-i="' + esc(pk.id) + '" data-j="delivered">Handed over in person</button>';
-  if (pk.status === "confirmed" || pk.status === "processing") out += '<div style="margin-top:14px"><h3>Cannot fulfil this order?</h3><p class="muted small">The buyer gets a full refund.</p>' + H.fld("Reason", "so_r", "", 'maxlength="300"') + '<label class="row" style="padding:6px 0"><input type="checkbox" id="so_rs" checked> <span class="l">Put the items back in stock</span></label><button class="btn danger block" data-a="socancel" data-i="' + esc(pk.id) + '">' + (R.UI.confirm === "c" + pk.id ? "Tap again to cancel and refund" : "Cancel and refund buyer") + "</button></div>";
+  if (pk.status === "confirmed" || pk.status === "processing") out += '<div style="margin-top:14px"><h3>Cannot fulfil this order?</h3><p class="muted small">The buyer gets a full refund.</p>' + H.fld("Reason", "so_r", "", 'maxlength="300"') + '<label class="row" style="padding:6px 0"><input type="checkbox" id="so_rs" checked> <span class="l">Put the items back in stock</span></label><button class="btn danger block" data-a="socancel" data-i="' + esc(pk.id) + '">' + "Cancel and refund buyer" + "</button></div>";
   var hist = (pk.history || []).slice().reverse();
   if (hist.length) out += '<h3 style="margin:18px 0 6px">History</h3><div class="list">' + hist.map(function (h) { return '<div class="row"><span class="l">' + esc(R.stLabel(h.to)) + '<br><span class="muted small">' + R.when(h.at) + (h.reason ? " · " + esc(h.reason) : "") + "</span></span></div>"; }).join("") + "</div>";
   return out;

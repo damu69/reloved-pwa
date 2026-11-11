@@ -59,6 +59,21 @@ function ph(title, pid, imgId, size, extra, cat, alt) {
 // Alt text for a product photo: "Maroon silk saree, Biba, Good".
 function photoAlt(title, brand, cond) { return [title, brand, COND[cond] || cond].filter(Boolean).join(", "); }
 var HEART = '<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3 5 6.5 5c2 0 3.6 1.1 5.5 3 1.9-1.9 3.5-3 5.5-3C21 5 22.8 8.6 21.5 11.8 19.5 16.4 12 21 12 21z"/></svg>';
+// Confirmation pop-up (all screens). Resolves true on the action button, false on Cancel, tapping outside or Escape.
+function ask(title, text, okLabel) {
+  return new Promise(function (done) {
+    var wrap = document.createElement("div");
+    wrap.innerHTML = '<div class="scrim"></div><div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="askt"><h3 id="askt" style="margin:0 0 6px">' + esc(title) + "</h3>" +
+      (text ? '<p class="muted small" style="margin:0 0 14px">' + esc(text) + "</p>" : "") +
+      '<div class="two"><button type="button" class="btn ghost" data-ask="0">Cancel</button><button type="button" class="btn danger" data-ask="1">' + esc(okLabel || "Confirm") + "</button></div></div>";
+    function close(v) { document.removeEventListener("keydown", key); wrap.remove(); done(v); }
+    function key(e) { if (e.key === "Escape") close(false); }
+    wrap.addEventListener("click", function (e) { var b = e.target.closest("[data-ask]"); if (b) close(b.getAttribute("data-ask") === "1"); else if (e.target.classList.contains("scrim")) close(false); });
+    document.addEventListener("keydown", key);
+    document.body.appendChild(wrap);
+    var ok = wrap.querySelector('[data-ask="1"]'); if (ok) ok.focus();
+  });
+}
 var toastT;
 function toast(m) { Array.prototype.forEach.call(document.querySelectorAll(".toast"), function (x) { x.remove(); }); var d = document.createElement("div"); d.className = "toast"; d.textContent = m; $("app").appendChild(d); clearTimeout(toastT); toastT = setTimeout(function () { d.remove(); }, 3200); }
 function errText(e) {
@@ -713,13 +728,13 @@ V.order = function (id) {
     out += '<section class="ccard"><div class="ccard-h">' + ico("store") + "<b>" + esc(pk.sellerName) + '</b><span class="pill ' + stClass(pk.status) + '">' + esc(stLabel(pk.status)) + "</span></div>" +
       pk.items.map(function (i) { return '<button class="citem" data-a="item" data-i="' + esc(i.productId) + '"><span class="citem-ph">' + ph(i.title, i.productId, i.coverImageId, 200) + '</span><span class="citem-b"><b class="clip">' + esc(i.title) + '</b><span class="muted small">' + esc(variantLabel(i.options)) + " × " + i.quantity + '</span><span class="price">' + inr(i.netPaise) + "</span></span></button>"; }).join("") +
       '<p class="muted small pk-del">' + ico("truck") + esc(pk.delivery.label) + " · " + (pk.delivery.feePaise ? inr(pk.delivery.feePaise) : "Free") + (pk.carrier ? " · " + esc(pk.carrier) + " " + esc(pk.trackingNumber || "") : "") + "</p>" + (pk.status === "delivered" ? rateBoxHTML(pk, rc) : "") +
-      (o.paymentStatus !== "unpaid" && o.status !== "cancelled" && (pk.status === "confirmed" || pk.status === "processing") ? '<button class="linkbtn danger-link" data-a="pcancel" data-i="' + esc(o.id) + '" data-j="' + esc(pk.id) + '">' + (UI.confirm === pk.id ? "Tap again to cancel this package" : "Cancel this package") + "</button>" : "") + "</section>";
+      (o.paymentStatus !== "unpaid" && o.status !== "cancelled" && (pk.status === "confirmed" || pk.status === "processing") ? '<button class="linkbtn danger-link" data-a="pcancel" data-i="' + esc(o.id) + '" data-j="' + esc(pk.id) + '">' + "Cancel this package" + "</button>" : "") + "</section>";
   });
   out += '<section class="ccard"><div class="ccard-h">' + ico("pin") + "<b>Delivering to</b></div><p class=\"addr-p\"><b>" + esc(a.name) + "</b><br>" + addrText(a) + "</p></section>";
   out += '<section class="ccard"><div class="ccard-h"><b>Payment summary</b></div>' + totalsHTML(t) + "</section>";
   var hist = o.packages.reduce(function (a2, pk) { return a2.concat((pk.history || []).map(function (h) { return { h: h, pk: pk.number }; })); }, []).sort(function (x, y) { return new Date(y.h.at) - new Date(x.h.at); });
   if (hist.length) out += '<section class="ccard"><div class="ccard-h">' + ico("clock") + '<b>History</b></div><ol class="timeline">' + hist.map(function (x) { return "<li><b>" + esc(stLabel(x.h.to)) + '</b><span class="muted small">' + esc(x.pk) + " · " + when(x.h.at) + (x.h.reason ? " · " + esc(x.h.reason) : "") + "</span></li>"; }).join("") + "</ol></section>";
-  if (unpaid || (o.paymentStatus !== "unpaid" && o.status !== "cancelled" && o.status !== "shipped" && o.status !== "delivered")) out += '<p class="sl-danger"><button data-a="ocancel" data-i="' + esc(o.id) + '">' + (UI.confirm === o.id ? "Tap again to cancel the order" : "Cancel order") + "</button></p>";
+  if (unpaid || (o.paymentStatus !== "unpaid" && o.status !== "cancelled" && o.status !== "shipped" && o.status !== "delivered")) out += '<p class="sl-danger"><button data-a="ocancel" data-i="' + esc(o.id) + '">' + "Cancel order" + "</button></p>";
   return out;
 };
 V.wish = function () {
@@ -960,8 +975,7 @@ async function act(a, i, j, el) {
     }
     case "order": go("order", i); return;
     case "ocancel": {
-      if (UI.confirm !== i) { UI.confirm = i; render(); return; }
-      UI.confirm = null;
+      if (!(await ask("Cancel this order?", "Every package in it is cancelled. Anything you paid is refunded.", "Cancel order"))) return;
       try { await api.post("/orders/" + i + "/cancel", { reason: "Cancelled by buyer" }); toast("Order cancelled"); drop("order"); drop("orders"); await loadCart(); }
       catch (e) { toast(errText(e)); }
       render(); return;
@@ -979,8 +993,7 @@ async function act(a, i, j, el) {
       render(); return;
     }
     case "pcancel": {
-      if (UI.confirm !== j) { UI.confirm = j; render(); return; }
-      UI.confirm = null;
+      if (!(await ask("Cancel this package?", "The seller will not ship it and you get a full refund for it.", "Cancel package"))) return;
       try { await api.post("/orders/" + i + "/packages/" + j + "/cancel", { reason: "Cancelled by buyer" }); toast("Package cancelled. Your refund is on its way."); drop("order"); drop("orders"); }
       catch (e) { toast(errText(e)); }
       render(); return;
@@ -1064,7 +1077,7 @@ function start() {
 }
 // A photo that fails to load is removed so the colour placeholder shows. Done here, not with an inline onerror attribute, because the site's Content-Security-Policy forbids inline handlers.
 document.addEventListener("error", function (ev) { var t = ev.target; if (t && t.tagName === "IMG" && t.hasAttribute("data-rm")) t.remove(); }, true);
-window.RL = { ico: ico, V: V, A: {}, E: {}, PCAT: PCAT, paintNav: renderNav, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, afterAuth: afterAuth, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
+window.RL = { ask: ask, ico: ico, V: V, A: {}, E: {}, PCAT: PCAT, paintNav: renderNav, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, afterAuth: afterAuth, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
   current: function () { return cur(); }, canBack: function () { return stack.length > 0; }, replace: replace, itemUrl: itemUrl };
 boot();
 window.__reloved = { S: S, UI: UI };

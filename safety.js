@@ -109,11 +109,11 @@ V.adreports = function () {
       (open ? '<div class="two" style="margin-top:8px">' + (t === "product" ? btn(r.id, "remove", "Remove listing") : "") + (t !== "conversation" ? btn(r.id, "suspend", "Suspend user") : "") + btn(r.id, "dismiss", "Dismiss") + "</div>" : (r.adminNote ? '<span class="small muted">Note: ' + esc(r.adminNote) + "</span>" : "")) + "</div>";
   }).join("");
 };
-function btn(id, act, label) { var k = id + ":" + act; return '<button class="btn ' + (act === "dismiss" ? "ghost" : "danger") + ' sm" data-a="adrs" data-i="' + esc(id) + '" data-j="' + act + '">' + (armed === k ? "Tap again" : label) + "</button>"; }
+function btn(id, act, label) { var k = id + ":" + act; return '<button class="btn ' + (act === "dismiss" ? "ghost" : "danger") + ' sm" data-a="adrs" data-i="' + esc(id) + '" data-j="' + act + '">' + label + "</button>"; }
 A.adrf = function (i) { RF = i; armed = ""; R.render(); };
 A.adrs = async function (id, act) {
   var k = id + ":" + act;
-  if (act !== "dismiss" && armed !== k) { armed = k; return R.render(); }
+  if (act !== "dismiss" && !(await R.ask(act === "remove" ? "Remove this listing?" : "Suspend this user?", act === "remove" ? "Buyers stop seeing it. The seller is told why." : "They are signed out and cannot sign in until reactivated.", act === "remove" ? "Remove listing" : "Suspend"))) return;
   armed = "";
   try { await api.post("/admin/reports/" + id + "/resolve", { action: act }); drop("ad:reports:open"); drop("ad:reports:actioned"); drop("ad:reports:dismissed"); toast("Done"); } catch (x) { toast(errText(x)); }
   R.render();

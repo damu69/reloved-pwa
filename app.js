@@ -134,7 +134,42 @@ var ADDR_RULES = [
   { id: "ads", path: "state", label: "State", min: 2 },
   { id: "adz", path: "pincode", label: "PIN code", re: PIN_RE, msg: "Enter a 6-digit PIN code, for example 682001." }
 ];
-function row(ic, l, v, attr, tog) { return '<button class="row" ' + attr + '><span class="ic">' + ic + '</span><span class="l">' + l + "</span>" + (v !== "" && v != null ? '<span class="v">' + v + "</span>" : "") + (tog || '<span class="chev"></span>') + "</button>"; }
+// Line icons used by list rows and cards. Rows from older screens pass one character ("O", "₹"); those map to an icon too.
+var IC = {
+  box: '<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>',
+  heart: '<path d="M12 20s-7-4.3-8.9-8.6C1.9 8.4 3.6 5 6.8 5c1.9 0 3.4 1 5.2 2.8C13.8 6 15.3 5 17.2 5c3.2 0 4.9 3.4 3.7 6.4C19 15.7 12 20 12 20z"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  store: '<path d="M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9h16M9 20v-6h6v6"/>',
+  shield: '<path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/>',
+  doc: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
+  tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/>',
+  rupee: '<path d="M7 5h10M7 9h10M13 9c0 3-2 5-6 5l7 6"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 3-5.5 6.5-5.5s6.5 1.9 6.5 5.5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.7c2.2.6 3.5 2.3 3.5 5.3"/>',
+  flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+  star: '<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/>',
+  grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+  percent: '<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/>',
+  download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  logout: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
+  block: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+  truck: '<path d="M3 6h11v10H3zM14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+  chat: '<path d="M4 5h16v11H10l-5 4v-4H4z"/>',
+  card: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/>',
+  check: '<path d="M20 6L9 17l-5-5"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>'
+};
+var IC_CHAR = { O: "box", "♥": "heart", A: "pin", S: "gear", $: "store", "★": "star", "?": "help", i: "info", "§": "doc", P: "tag", "₹": "rupee", "+": "plus", U: "users", "!": "flag", C: "grid", "%": "percent", T: "clock", B: "block", X: "logout" };
+function ico(name) { return '<svg class="i" viewBox="0 0 24 24" aria-hidden="true">' + (IC[name] || IC[IC_CHAR[name]] || "") + "</svg>"; }
+function icOrChar(c) { return IC[c] || IC_CHAR[c] ? ico(c) : c; }
+function row(ic, l, v, attr, tog) { return '<button class="row" ' + attr + '><span class="ic">' + icOrChar(ic) + '</span><span class="l">' + l + "</span>" + (v !== "" && v != null ? '<span class="v">' + v + "</span>" : "") + (tog || '<span class="chev"></span>') + "</button>"; }
 function head(title, back, right) { return '<div class="bar">' + (back ? '<button class="back" data-a="back" aria-label="Back"><span class="chev" style="transform:rotate(-135deg);margin-left:4px"></span></button>' : "") + "<h1>" + title + "</h1>" + (right || "") + "</div>"; }
 function sw(on) { return '<span class="toggle" role="switch" aria-checked="' + !!on + '"></span>'; }
 function sum(l, v, cls) { return '<div class="sum ' + (cls || "") + '"><span>' + l + "</span><span>" + v + "</span></div>"; }
@@ -514,49 +549,73 @@ V.item = function (pid) {
   var inCart = v && S.cart && S.cart.items.filter(function (i) { return i.variantId === v.id; })[0];
   var f = !!S.wish[pid], imgs = p.images && p.images.length ? p.images : [null];
   var off = v && v.mrpPaise > v.pricePaise ? Math.round((1 - v.pricePaise / v.mrpPaise) * 100) : 0;
-  return head("", true, '<button class="back" data-a="fav" data-i="' + esc(pid) + '" aria-label="Favourite" aria-pressed="' + f + '"><span class="heart' + (f ? " on" : "") + '" style="position:static;background:none">' + HEART + "</span></button>") +
-    crumbsHTML(p.categoryPath, false) +
-    '<div class="itemgrid"><div class="gallery">' + imgs.map(function (im, n) { return ph(p.title, pid, im && im.id, 1200, "", null, photoAlt(p.title, p.brandName, p.condition) + (imgs.length > 1 ? ", photo " + (n + 1) + " of " + imgs.length : "")); }).join("") + '</div><div class="iteminfo">' +
-    "<h2>" + esc(p.title) + '</h2><div class="price price-lg">' + (v ? inr(v.pricePaise) : "") + (off ? ' <s class="muted small" style="font-weight:400">' + inr(v.mrpPaise) + '</s> <small>' + off + "% off</small>" : "") + '</div><div class="muted small">Price includes GST</div>' +
-    (vs.length > 1 || (vs[0] && Object.keys(vs[0].options || {}).length) ? '<h3 style="margin:14px 0 6px">' + (vs.length > 1 ? "Choose an option" : "Option") + '</h3><div class="chips" style="flex-wrap:wrap">' + vs.map(function (x) { return '<button class="chip' + (v && x.id === v.id ? " on" : "") + '" data-a="vsel" data-i="' + esc(pid) + '" data-j="' + esc(x.id) + '"' + (x.inStock ? "" : ' style="opacity:.45;text-decoration:line-through"') + ">" + esc(variantLabel(x.options)) + "</button>"; }).join("") + "</div>" : "") +
-    (v && v.onlyLeft ? '<div class="pill prog" style="display:inline-block">Only ' + v.onlyLeft + " left</div>" : "") +
-    '<dl class="kv"><dt>Condition</dt><dd>' + esc(COND[p.condition] || p.condition) + "</dd><dt>Brand</dt><dd>" + esc(p.brandName || "Not stated") + "</dd><dt>Category</dt><dd>" + esc(p.categoryName || "") + "</dd>" +
-    Object.keys(p.attributes || {}).map(function (k) { return "<dt>" + esc(k.charAt(0).toUpperCase() + k.slice(1)) + "</dt><dd>" + esc(p.attributes[k]) + "</dd>"; }).join("") + "</dl>" +
-    (p.description ? "<p>" + esc(p.description).replace(/\n/g, "<br>") + "</p>" : "") +
-    (p.seller ? '<button class="itemcard" data-a="seller" data-i="' + esc(p.seller.id) + '" data-j="' + esc(p.seller.displayName) + '" style="margin:12px 0"><span class="av" style="background:hsl(' + hueOf(p.seller.displayName) + ',40%,32%)">' + esc(String(p.seller.displayName).slice(0, 1).toUpperCase()) + '</span><span style="flex:1"><b>' + esc(p.seller.displayName) + '</b> <span class="pill ok">Verified seller</span><br>' + (p.seller.ratingCount ? starsText(p.seller.ratingAvg, p.seller.ratingCount) + ' <span class="muted small">· See more</span>' : '<span class="muted small">See more from this seller</span>') + '</span><span class="chev"></span></button>' : "") +
-    // The buying action comes first, then the secondary one (Vinted: Buy now, Make an offer, Message seller).
-    (v && v.inStock ? (inCart ? '<div class="two"><button class="btn ghost" data-a="tab" data-i="cart">View cart (' + inCart.quantity + ')</button><button class="btn" data-a="addcart" data-i="' + esc(v.id) + '">Add one more</button></div>' : '<button class="btn block" data-a="addcart" data-i="' + esc(v.id) + '"' + (UI.busy ? " disabled" : "") + ">Add to cart</button>") : '<div class="banner">This option is sold out.</div>') +
-    '<button class="btn ghost block" data-a="msgseller" data-i="' + esc(pid) + '" style="margin-top:10px">Message seller</button>' +
+  var at = p.attributes || {}, cond = COND[p.condition] || p.condition;
+  var hasOpts = vs.length > 1 || (vs[0] && Object.keys(vs[0].options || {}).length);
+  var optName = vs[0] && vs[0].options && Object.keys(vs[0].options).length === 1 ? Object.keys(vs[0].options)[0] : "";
+  function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
+  function attrVal(k, x) { return k === "gender" ? (GENDERS[x] || cap(x)) : x; }
+  var ICON_SHARE = svgI('<path d="M12 3v12M7 8l5-5 5 5M5 13v6h14v-6"/>'), ICON_MSG = svgI('<path d="M4 5h16v11H10l-5 4v-4H4z"/>');
+  var ICON_SHIELD = svgI('<path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>');
+  // Photos: full width on phones with the back, favourite and share buttons on top and a "1 / 4" counter; a stack on laptops.
+  var gallery = '<div class="igal"><div class="gallery" id="igal" data-n="' + imgs.length + '">' + imgs.map(function (im, n) { return ph(p.title, pid, im && im.id, 1200, "", null, photoAlt(p.title, p.brandName, p.condition) + (imgs.length > 1 ? ", photo " + (n + 1) + " of " + imgs.length : "")); }).join("") + "</div>" +
+    '<button class="igbtn ig-back" data-a="back" aria-label="Back">' + ICON_PREV + "</button>" +
+    '<span class="ig-r"><button class="igbtn" data-a="share" data-i="' + esc(pid) + '" aria-label="Share">' + ICON_SHARE + '</button><button class="igbtn" data-a="fav" data-i="' + esc(pid) + '" aria-label="Favourite" aria-pressed="' + f + '"><span class="heart' + (f ? " on" : "") + '">' + HEART + "</span></button></span>" +
+    (imgs.length > 1 ? '<span class="ig-count" id="igcount" aria-hidden="true">1 / ' + imgs.length + "</span>" : "") + "</div>";
+  var facts = [hasOpts ? "" : at.size, cond, p.brandName].filter(Boolean);
+  var buy = v && v.inStock ? (inCart ? '<button class="btn ghost" data-a="tab" data-i="cart">In cart (' + inCart.quantity + ')</button><button class="btn" data-a="addcart" data-i="' + esc(v.id) + '">Add one more</button>'
+      : '<button class="btn" data-a="addcart" data-i="' + esc(v.id) + '"' + (UI.busy ? " disabled" : "") + ">Add to cart</button>") : '<button class="btn" disabled>Sold out</button>';
+  return '<div class="itempage"><div class="ip-top">' + head("", true) + "</div>" + crumbsHTML(p.categoryPath, false) +
+    '<div class="itemgrid">' + gallery + '<div class="iteminfo">' +
+    '<div class="it-head">' + (p.brandName ? '<div class="it-brand">' + esc(p.brandName) + "</div>" : "") + '<h1 class="it-title">' + esc(p.title) + "</h1>" +
+    '<div class="it-price"><span class="price">' + (v ? inr(v.pricePaise) : "") + "</span>" + (off ? '<s>' + inr(v.mrpPaise) + '</s><span class="it-off">' + off + "% off</span>" : "") + "</div>" +
+    '<div class="muted small">Price includes GST. Delivery shown at checkout.</div>' +
+    (facts.length ? '<div class="it-facts">' + facts.map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div>" : "") + "</div>" +
+    (hasOpts ? '<div class="it-size"><h3>' + (optName ? esc(cap(optName)) : vs.length > 1 ? "Choose an option" : "Option") + (v && v.onlyLeft ? ' <span class="pill prog">Only ' + v.onlyLeft + " left</span>" : "") + '</h3><div class="chips wrap">' + vs.map(function (x) { return '<button class="chip' + (v && x.id === v.id ? " on" : "") + (x.inStock ? "" : " out") + '" data-a="vsel" data-i="' + esc(pid) + '" data-j="' + esc(x.id) + '"' + (x.inStock ? "" : ' aria-label="' + esc(variantLabel(x.options)) + ', sold out"') + ">" + esc(variantLabel(x.options)) + "</button>"; }).join("") + "</div></div>" : "") +
+    (p.seller ? '<button class="itemcard it-seller" data-a="seller" data-i="' + esc(p.seller.id) + '" data-j="' + esc(p.seller.displayName) + '"><span class="av" style="background:hsl(' + hueOf(p.seller.displayName) + ',40%,32%)">' + esc(String(p.seller.displayName).slice(0, 1).toUpperCase()) + '</span><span style="flex:1;min-width:0"><b>' + esc(p.seller.displayName) + '</b> <span class="pill ok">Verified</span><br>' + (p.seller.ratingCount ? starsText(p.seller.ratingAvg, p.seller.ratingCount) : '<span class="muted small">See more from this seller</span>') + '</span><span class="chev"></span></button>' : "") +
+    (p.description ? '<section class="it-sec"><h3>About this item</h3><p>' + esc(p.description).replace(/\n/g, "<br>") + "</p></section>" : "") +
+    '<section class="it-sec"><h3>Details</h3><dl class="kv"><dt>Condition</dt><dd>' + esc(cond) + "</dd><dt>Brand</dt><dd>" + esc(p.brandName || "Not stated") + "</dd><dt>Category</dt><dd>" + esc(p.categoryName || "") + "</dd>" +
+    Object.keys(at).map(function (k) { return "<dt>" + esc(cap(k)) + "</dt><dd>" + esc(attrVal(k, at[k])) + "</dd>"; }).join("") + "</dl></section>" +
     // Only approved sellers' listings are public (the API's VISIBLE rule), so every seller shown here has been verified.
-    '<div class="banner trust" style="margin-top:12px"><b>Buyer Protection</b><span class="small muted">If it arrives damaged or fake, ask for a return within 7 days of delivery. Pay inside Reloved to stay covered. Buyer Protection and delivery fees are shown before you order.</span> <a class="small" href="/home/doc/how" data-a="go" data-i="doc" data-j="how">How it works</a></div>' +
-    '<p style="margin-top:6px"><button class="small muted" style="text-decoration:underline" data-a="share" data-i="' + esc(pid) + '">Share this item</button> · <button class="small muted" style="text-decoration:underline" data-a="reportitem" data-i="' + esc(pid) + '">Report this listing</button></p></div></div>';
+    '<div class="it-protect">' + ICON_SHIELD + '<div><b>Buyer Protection</b><span>Damaged or fake? Ask for a return within 7 days of delivery. Pay inside Reloved to stay covered.</span> <a href="/home/doc/how" data-a="go" data-i="doc" data-j="how">How it works</a></div></div>' +
+    '<p class="it-links"><button data-a="share" data-i="' + esc(pid) + '">Share this item</button><button data-a="reportitem" data-i="' + esc(pid) + '">Report this listing</button></p>' +
+    // The buying action: a bar stuck to the bottom of the screen on phones, under the price on laptops (CSS order).
+    '<div class="buybar"><span class="bb-price"><b>' + (v ? inr(v.pricePaise) : "") + "</b>" + (v && hasOpts ? '<span>' + esc(variantLabel(v.options)) + "</span>" : "") + '</span><button class="btn ghost bb-msg" data-a="msgseller" data-i="' + esc(pid) + '" aria-label="Message seller">' + ICON_MSG + '<span>Message</span></button>' + buy + "</div>" +
+    "</div></div></div>";
 };
 function probText(p) {
   var code = p && (p.code || p), n = p && (p.available != null ? p.available : p.left);
   return ({ NOT_AVAILABLE: "No longer available", OWN_PRODUCT: "This is your own item", OUT_OF_STOCK: "Out of stock", ONLY_N_LEFT: n != null ? "Only " + n + " left" : "Fewer left than in your cart", QUANTITY_LIMIT: "Over the quantity limit", CART_TOO_LARGE: "Cart is too large", PRICE_CHANGED: "Price changed" })[code] || String(code);
 }
+/* ---- shared pieces for account screens: grouped lists with a small heading, cards, a sticky bottom action bar ---- */
+function group(title, rows) { return '<section class="grp">' + (title ? "<h2 class=\"grp-h\">" + title + "</h2>" : "") + '<div class="list">' + rows + "</div></section>"; }
+function addrText(a) { return esc(a.line1) + (a.line2 ? ", " + esc(a.line2) : "") + "<br>" + esc(a.city) + ", " + esc(a.state) + " " + esc(a.pincode); }
+function totalsHTML(t, n) {
+  return '<div class="totals">' + sum("Items" + (n ? " (" + n + ")" : ""), inr(t.itemsSubtotalPaise)) + (t.discountPaise ? sum("Coupon discount", "−" + inr(t.discountPaise)) : "") + sum("Delivery", t.deliveryPaise ? inr(t.deliveryPaise) : "Free") + sum("Buyer Protection", inr(t.buyerProtectionPaise)) + sum("Total", inr(t.totalPaise), "total") + "</div>";
+}
+function payBar(label, value, btn, cls) { return '<div class="paybar ' + (cls || "") + '"><span class="pb-l"><span>' + label + "</span><b>" + value + "</b></span>" + btn + "</div>"; }
 V.cart = function () {
   if (!signedIn()) return V.gate("Your cart", "Sign in to add items to your cart and check out.");
   var k = S.cart;
   if (!k) return head("Your cart") + loadingBox();
-  if (!k.items.length) return head("Your cart") + '<div class="empty"><h2>Your cart is empty</h2>Find something you like and add it here.<div style="margin-top:12px"><button class="btn sm" data-a="tab" data-i="home">Start browsing</button></div></div>';
+  if (!k.items.length) return head("Your cart") + '<div class="empty"><span class="empty-ic">' + ico("box") + '</span><h2>Your cart is empty</h2>Find something you like and add it here.<div style="margin-top:14px"><button class="btn" data-a="tab" data-i="home">Start browsing</button></div></div>';
   var byPkg = {}; k.items.forEach(function (i) { (byPkg[i.sellerId] = byPkg[i.sellerId] || []).push(i); });
-  var out = head("Your cart");
-  k.packages.forEach(function (pk) {
-    out += '<h3 style="margin:6px 0">From ' + esc(pk.sellerName) + '</h3><div class="list" style="padding:4px 0">' + (byPkg[pk.sellerId] || []).map(function (i) {
-      return '<div class="row" style="align-items:flex-start;display:block"><div style="display:flex;gap:12px"><div style="width:64px;flex:none">' + ph(i.title, i.productId, i.coverImageId, 200) + '</div><div style="flex:1;min-width:0"><b>' + esc(i.title) + '</b><br><span class="muted small">' + esc(variantLabel(i.options)) + "</span><br>" +
-        '<span class="price">' + inr(i.unitPricePaise) + "</span>" + (i.problems && i.problems.length ? '<div class="bad small">' + i.problems.filter(function (p) { return (p.code || p) !== "PRICE_CHANGED"; }).map(probText).map(esc).join(", ") + "</div>" : "") + "</div></div>" +
-        '<div style="display:flex;align-items:center;gap:10px;margin-top:8px"><div class="qty"><button data-a="cartqty" data-i="' + esc(i.variantId) + '" data-j="-1" aria-label="Fewer">−</button><span>' + i.quantity + '</span><button data-a="cartqty" data-i="' + esc(i.variantId) + '" data-j="1" aria-label="More">+</button></div><span style="flex:1"></span><button class="small bad" data-a="cartrm" data-i="' + esc(i.variantId) + '">Remove</button></div></div>';
-    }).join("") + "</div>" +
-      '<label class="field"><span>Delivery from ' + esc(pk.sellerName) + '</span><select class="inp" data-delv="' + esc(pk.sellerId) + '">' + pk.deliveryChoices.map(function (d) { return '<option value="' + esc(d.code) + '"' + (pk.delivery.code === d.code ? " selected" : "") + ">" + esc(d.label) + " · " + (d.feePaise ? inr(d.feePaise) : "Free") + "</option>"; }).join("") + "</select></label>";
-  });
-  out += '<h3 style="margin:8px 0 6px">Coupon</h3>' + (k.coupon ? '<div class="banner" style="display:flex;gap:10px;align-items:center"><span style="flex:1"><b>' + esc(k.coupon.code || "") + '</b><br><span class="small muted">' + esc(k.coupon.description || "Coupon applied") + '</span></span><button class="chip" data-a="couponrm">Remove</button></div>' :
-    '<div class="composer" style="position:static;padding:0 0 8px"><input class="inp" id="cpn" placeholder="Enter a coupon code" value="' + esc(UI.coupon) + '" autocapitalize="characters"><button class="btn" data-a="coupon">Apply</button></div>') + (UI.couponErr ? '<p class="bad small">' + esc(UI.couponErr) + "</p>" : "");
-  var t = k.totals;
-  out += '<div style="margin-top:12px">' + sum("Items", inr(t.itemsSubtotalPaise)) + (t.discountPaise ? sum("Coupon discount", "−" + inr(t.discountPaise)) : "") + sum("Delivery", t.deliveryPaise ? inr(t.deliveryPaise) : "Free") + sum("Buyer Protection", inr(t.buyerProtectionPaise)) + sum("Total", inr(t.totalPaise), "total") + "</div>" +
-    '<p class="muted small">Prices include GST (' + inr(t.gstIncludedInItemsPaise) + " in items).</p>" +
-    '<button class="btn block" data-a="checkout"' + (k.canCheckout ? "" : " disabled") + ">Go to checkout</button>" + (k.canCheckout ? "" : '<p class="bad small">Fix the items marked above to continue.</p>');
-  return out;
+  var n = cartCount(), t = k.totals;
+  var pkgs = k.packages.map(function (pk) {
+    return '<section class="ccard"><div class="ccard-h">' + ico("store") + "<b>" + esc(pk.sellerName) + "</b></div>" + (byPkg[pk.sellerId] || []).map(function (i) {
+      var probs = (i.problems || []).filter(function (p) { return (p.code || p) !== "PRICE_CHANGED"; });
+      return '<div class="citem"><a class="citem-ph" href="' + esc(itemUrl(i.productId, i.title)) + '" data-a="item" data-i="' + esc(i.productId) + '">' + ph(i.title, i.productId, i.coverImageId, 200) + '</a><div class="citem-b"><b class="clip">' + esc(i.title) + '</b><span class="muted small">' + esc(variantLabel(i.options)) + '</span><span class="price">' + inr(i.unitPricePaise) + "</span>" +
+        (probs.length ? '<span class="bad small">' + probs.map(probText).map(esc).join(", ") + "</span>" : "") +
+        '<div class="citem-a"><div class="qty"><button data-a="cartqty" data-i="' + esc(i.variantId) + '" data-j="-1" aria-label="Fewer">−</button><span>' + i.quantity + '</span><button data-a="cartqty" data-i="' + esc(i.variantId) + '" data-j="1" aria-label="More">+</button></div><button class="iconbtn" data-a="cartrm" data-i="' + esc(i.variantId) + '" aria-label="Remove ' + esc(i.title) + '">' + ico("trash") + "</button></div></div></div>";
+    }).join("") +
+      '<label class="field cdel"><span>' + ico("truck") + 'Delivery</span><select class="inp" data-delv="' + esc(pk.sellerId) + '">' + pk.deliveryChoices.map(function (d) { return '<option value="' + esc(d.code) + '"' + (pk.delivery.code === d.code ? " selected" : "") + ">" + esc(d.label) + " · " + (d.feePaise ? inr(d.feePaise) : "Free") + "</option>"; }).join("") + "</select></label></section>";
+  }).join("");
+  var coupon = '<section class="ccard"><div class="ccard-h">' + ico("tag") + "<b>Coupon</b></div>" + (k.coupon ? '<div class="coupon-on"><span><b>' + esc(k.coupon.code || "") + '</b><br><span class="small muted">' + esc(k.coupon.description || "Coupon applied") + '</span></span><button class="chip" data-a="couponrm">Remove</button></div>' :
+    '<div class="coupon-in"><input class="inp" id="cpn" placeholder="Enter a coupon code" value="' + esc(UI.coupon) + '" autocapitalize="characters" aria-label="Coupon code"><button class="btn ghost" data-a="coupon">Apply</button></div>') + (UI.couponErr ? '<p class="bad small">' + esc(UI.couponErr) + "</p>" : "") + "</section>";
+  var cbtn = '<button class="btn" data-a="checkout"' + (k.canCheckout ? "" : " disabled") + ">Checkout</button>";
+  var summary = '<section class="ccard csum"><div class="ccard-h"><b>Order summary</b></div>' + totalsHTML(t, n) + '<p class="muted small">Prices include GST (' + inr(t.gstIncludedInItemsPaise) + ' in items).</p>' +
+    (k.canCheckout ? "" : '<p class="bad small">Fix the items marked above to continue.</p>') +
+    payBar("Total", inr(t.totalPaise), cbtn, "pb-desk") + "</section>";
+  return head("Your cart" + ' <span class="hcount">' + n + (n === 1 ? " item" : " items") + "</span>") + '<div class="cols"><div class="col-main">' + pkgs + coupon + '</div><div class="col-side">' + summary + "</div></div>" + payBar("Total", inr(t.totalPaise), cbtn, "pb-mob");
 };
 V.gate = function (title, msg) { return head(title) + '<div class="empty"><h2>Sign in to continue</h2>' + esc(msg || "") + '<div style="margin-top:12px"><button class="btn" data-a="go" data-i="auth">Sign in or create account</button></div></div>'; };
 V.auth = function () {
@@ -577,25 +636,26 @@ V.checkout = function () {
   if (!k || !k.items.length) return head("Checkout", true) + '<div class="empty"><h2>Your cart is empty</h2></div>';
   var c = need("addresses", function () { return api.get("/me/addresses").then(function (r) { return r.items || r; }); });
   var t = k.totals, K = UI.ck;
-  var out = head("Checkout", true) + '<h3 style="margin:0 0 6px">Delivery address</h3>';
+  var out = '<section class="ccard"><div class="ccard-h">' + ico("pin") + "<b>Delivery address</b></div>";
   if (c.st === "loading") out += loadingBox();
   else if (c.st === "err") out += failBox(c.err);
   else {
     var list = c.data || [];
     if (!K.addressId || !list.some(function (a) { return a.id === K.addressId; })) { var d = list.filter(function (a) { return a.isDefault; })[0] || list[0]; K.addressId = d ? d.id : ""; }
     if (!list.length) K.adding = true;
-    out += (list.length ? '<div class="list">' + list.map(function (a) { return '<button class="row" data-a="addr" data-i="' + esc(a.id) + '"><span class="ic">' + (K.addressId === a.id ? "✓" : "") + '</span><span class="l"><b>' + esc(a.name) + "</b><br>" + esc(a.line1) + (a.line2 ? ", " + esc(a.line2) : "") + "<br>" + esc(a.city) + ", " + esc(a.state) + " " + esc(a.pincode) + '<br><span class="muted small">' + esc(a.phone) + "</span></span></button>"; }).join("") + "</div>" : "") +
-      (K.adding ? addressForm() : '<button class="btn ghost block" data-a="addrnew" style="margin-bottom:12px">Add a new address</button>');
+    out += list.map(function (a) { var on = K.addressId === a.id; return '<button class="addr' + (on ? " on" : "") + '" data-a="addr" data-i="' + esc(a.id) + '" role="radio" aria-checked="' + on + '"><span class="radio"></span><span class="l"><b>' + esc(a.name) + "</b><br>" + addrText(a) + '<br><span class="muted small">' + esc(a.phone) + "</span></span></button>"; }).join("") +
+      (K.adding ? addressForm() : '<button class="linkbtn addnew" data-a="addrnew">+ Add a new address</button>');
   }
-  out += '<h3 style="margin:8px 0 6px">Order summary</h3>' + k.packages.map(function (pk) { return sum(esc(pk.sellerName) + " · " + esc(pk.delivery.label), pk.delivery.feePaise ? inr(pk.delivery.feePaise) : "Free"); }).join("") +
-    sum("Items (" + cartCount() + ")", inr(t.itemsSubtotalPaise)) + (t.discountPaise ? sum("Coupon discount", "−" + inr(t.discountPaise)) : "") + sum("Delivery", t.deliveryPaise ? inr(t.deliveryPaise) : "Free") + sum("Buyer Protection", inr(t.buyerProtectionPaise)) + sum("Total", inr(t.totalPaise), "total") +
-    '<div class="banner warn" style="margin-top:12px"><b>Online payment is not switched on yet</b><span class="small">You can place the order, but it cannot be paid for now. Unpaid orders are released automatically after 15 minutes.</span></div>' +
-    (K.err ? '<p class="bad small">' + esc(K.err) + "</p>" : "") +
-    '<button class="btn block" data-a="place"' + (K.busy || !K.addressId || !k.canCheckout ? " disabled" : "") + ">" + (K.busy ? "Placing order…" : "Place order · " + inr(t.totalPaise)) + "</button>";
-  return out;
+  out += "</section>";
+  out += '<section class="ccard"><div class="ccard-h">' + ico("truck") + "<b>Delivery</b></div>" + k.packages.map(function (pk) { return sum(esc(pk.sellerName) + ' <span class="muted small">· ' + esc(pk.delivery.label) + "</span>", pk.delivery.feePaise ? inr(pk.delivery.feePaise) : "Free"); }).join("") + "</section>";
+  out += '<section class="ccard"><div class="ccard-h">' + ico("card") + "<b>Payment</b></div>" + '<div class="note warn"><b>Online payment is not switched on yet</b><span class="small">You can place the order, but it cannot be paid for now. Unpaid orders are released automatically after 15 minutes.</span></div></section>';
+  var pbtn = '<button class="btn" data-a="place"' + (K.busy || !K.addressId || !k.canCheckout ? " disabled" : "") + ">" + (K.busy ? "Placing…" : "Place order") + "</button>";
+  var side = '<section class="ccard csum"><div class="ccard-h"><b>Order summary</b></div>' + totalsHTML(t, cartCount()) + (K.err ? '<p class="bad small">' + esc(K.err) + "</p>" : "") +
+    payBar("To pay", inr(t.totalPaise), pbtn, "pb-desk") + "</section>";
+  return head("Checkout", true) + '<ol class="sl-steps ck-steps"><li class="done">Cart</li><li class="cur">Address and delivery</li><li>Payment</li></ol><div class="cols"><div class="col-main">' + out + '</div><div class="col-side">' + side + "</div></div>" + payBar("To pay", inr(t.totalPaise), pbtn, "pb-mob");
 };
 function addressForm() {
-  return '<div class="banner"><b>New address</b><label class="field"><span>Full name</span><input class="inp" id="adn" autocomplete="name"></label><label class="field"><span>Phone</span><input class="inp" id="adp" inputmode="tel" autocomplete="tel"></label>' +
+  return '<div class="ccard addform"><b>New address</b><label class="field"><span>Full name</span><input class="inp" id="adn" autocomplete="name"></label><label class="field"><span>Phone</span><input class="inp" id="adp" inputmode="tel" autocomplete="tel"></label>' +
     '<label class="field"><span>Address line 1</span><input class="inp" id="ad1" autocomplete="address-line1"></label><label class="field"><span>Address line 2 (optional)</span><input class="inp" id="ad2" autocomplete="address-line2"></label>' +
     '<label class="field"><span>Landmark (optional)</span><input class="inp" id="adl"></label><div class="two"><label class="field"><span>City</span><input class="inp" id="adc" autocomplete="address-level2"></label><label class="field"><span>State</span><input class="inp" id="ads" autocomplete="address-level1"></label></div>' +
     '<label class="field"><span>PIN code</span><input class="inp" id="adz" inputmode="numeric" maxlength="6" autocomplete="postal-code"></label><p class="bad small" id="aderr"></p><div class="two"><button class="btn" data-a="addrsave">Save address</button><button class="btn ghost" data-a="addrcancel">Cancel</button></div></div>';
@@ -607,9 +667,16 @@ V.addresses = function () {
   if (c.st === "loading") return out + loadingBox();
   if (c.st === "err") return out + failBox(c.err);
   var list = c.data || [];
-  out += list.length ? '<div class="list">' + list.map(function (a) { return '<div class="row" style="display:block"><b>' + esc(a.name) + (a.isDefault ? ' <span class="pill ok">Default</span>' : "") + "</b><br>" + esc(a.line1) + (a.line2 ? ", " + esc(a.line2) : "") + "<br>" + esc(a.city) + ", " + esc(a.state) + " " + esc(a.pincode) + '<br><span class="muted small">' + esc(a.phone) + '</span><div style="margin-top:8px;display:flex;gap:8px">' + (a.isDefault ? "" : '<button class="btn ghost sm" data-a="addrdef" data-i="' + esc(a.id) + '">Make default</button>') + '<button class="btn danger sm" data-a="addrdel" data-i="' + esc(a.id) + '">Delete</button></div></div>'; }).join("") + "</div>" : '<div class="empty">No saved addresses yet.</div>';
-  return out + (UI.ck.adding ? addressForm() : '<button class="btn ghost block" data-a="addrnew">Add a new address</button>');
+  out += list.length ? list.map(function (a) { return '<div class="ccard acard"><div class="acard-t">' + ico("pin") + "<b>" + esc(a.name) + "</b>" + (a.isDefault ? ' <span class="pill ok">Default</span>' : "") + '</div><p>' + addrText(a) + '<br><span class="muted small">' + esc(a.phone) + '</span></p><div class="acard-a">' + (a.isDefault ? "" : '<button class="btn ghost sm" data-a="addrdef" data-i="' + esc(a.id) + '">Make default</button>') + '<button class="linkbtn danger-link" data-a="addrdel" data-i="' + esc(a.id) + '">Delete</button></div></div>'; }).join("") : '<div class="empty"><span class="empty-ic">' + ico("pin") + "</span><h2>No saved addresses</h2>Add one to check out faster.</div>";
+  return out + (UI.ck.adding ? addressForm() : '<button class="btn ghost block" data-a="addrnew">+ Add a new address</button>');
 };
+var ORDER_STEPS = ["confirmed", "processing", "shipped", "delivered"];
+function trackHTML(status) {
+  if (status === "cancelled" || status === "pending_payment") return "";
+  var at = { confirmed: 0, processing: 1, partially_shipped: 2, shipped: 2, out_for_delivery: 2, partially_delivered: 3, delivered: 3 }[status];
+  if (at == null) return "";
+  return '<ol class="track">' + ["Confirmed", "Packed", "Shipped", "Delivered"].map(function (l, k) { return '<li class="' + (k <= at ? "done" : "") + (k === at ? " cur" : "") + '"><i></i>' + l + "</li>"; }).join("") + "</ol>";
+}
 V.orders = function () {
   if (!signedIn()) return V.gate("My orders", "Sign in to see your orders.");
   var c = need("orders", function () { return api.get("/orders?limit=50"); });
@@ -617,7 +684,7 @@ V.orders = function () {
   if (c.st === "loading") return out + loadingBox();
   if (c.st === "err") return out + failBox(c.err);
   var o = c.data.items || [];
-  return out + (o.length ? '<div class="list">' + o.map(function (x) { return '<button class="row" data-a="order" data-i="' + esc(x.id) + '"><span class="l"><b>Order ' + esc(x.number) + '</b><br><span class="muted small">' + when(x.placedAt) + " · " + x.itemCount + (x.itemCount === 1 ? " item" : " items") + '</span><br><span class="price">' + inr(x.totalPaise) + '</span></span><span class="pill ' + stClass(x.status) + '">' + esc(stLabel(x.status)) + "</span></button>"; }).join("") + "</div>" : '<div class="empty"><h2>No orders yet</h2>When you place an order it shows up here.</div>');
+  return out + (o.length ? '<div class="olist">' + o.map(function (x) { return '<button class="ocard" data-a="order" data-i="' + esc(x.id) + '"><span class="ocard-ic">' + ico("box") + '</span><span class="l"><span class="ocard-t"><b>Order ' + esc(x.number) + '</b><span class="pill ' + stClass(x.status) + '">' + esc(stLabel(x.status)) + '</span></span><span class="muted small">' + when(x.placedAt) + " · " + x.itemCount + (x.itemCount === 1 ? " item" : " items") + '</span><span class="price">' + inr(x.totalPaise) + '</span></span><span class="chev"></span></button>'; }).join("") + "</div>" : '<div class="empty"><span class="empty-ic">' + ico("box") + '</span><h2>No orders yet</h2>When you place an order it shows up here.<div style="margin-top:14px"><button class="btn" data-a="tab" data-i="home">Start shopping</button></div></div>');
 };
 function rateBoxHTML(pk, rc) {
   if (!rc || rc.st === "loading") return '<div class="ratebox"><div class="sk" style="height:18px;width:50%"></div></div>';
@@ -638,45 +705,51 @@ V.order = function (id) {
   if (c.st === "loading") return head("Order", true) + loadingBox();
   if (c.st === "err") return head("Order", true) + (c.code === "NOT_FOUND" ? '<div class="empty"><h2>Order not found</h2></div>' : failBox(c.err));
   var o = c.data, t = o.totals, a = o.shippingAddress || {}, unpaid = o.status === "pending_payment";
-  var out = head("Order " + esc(o.number), true) + '<p><span class="pill ' + stClass(o.status) + '">' + esc(stLabel(o.status)) + '</span> <span class="muted small">Placed ' + when(o.placedAt) + "</span></p>";
-  if (unpaid) out += '<div class="banner warn"><b>Waiting for payment</b><span class="small">Online payment is not switched on yet, so this order cannot be paid for now. It is released automatically at ' + when(o.expiresAt) + ".</span></div>";
-  if (o.cancelledAt) out += '<div class="banner"><b>Cancelled</b><span class="small muted">' + esc(o.cancelReason || "") + "</span></div>";
+  var out = head("Order " + esc(o.number), true) + '<section class="ccard ohead"><div class="ocard-t"><span class="pill ' + stClass(o.status) + '">' + esc(stLabel(o.status)) + '</span><span class="muted small">Placed ' + when(o.placedAt) + "</span></div>" + trackHTML(o.status) + "</section>";
+  if (unpaid) out += '<div class="note warn"><b>Waiting for payment</b><span class="small">Online payment is not switched on yet, so this order cannot be paid for now. It is released automatically at ' + when(o.expiresAt) + ".</span></div>";
+  if (o.cancelledAt) out += '<div class="note"><b>Cancelled</b><span class="small muted">' + esc(o.cancelReason || "") + "</span></div>";
   var rc = o.packages.some(function (pk) { return pk.status === "delivered"; }) ? need("ratings:mine", function () { return api.get("/ratings/mine"); }) : null;
   o.packages.forEach(function (pk) {
-    out += '<h3 style="margin:14px 0 6px">From ' + esc(pk.sellerName) + ' <span class="pill ' + stClass(pk.status) + '">' + esc(stLabel(pk.status)) + '</span></h3><div class="list">' + pk.items.map(function (i) { return '<button class="row" data-a="item" data-i="' + esc(i.productId) + '"><span class="l"><b>' + esc(i.title) + '</b><br><span class="muted small">' + esc(variantLabel(i.options)) + " × " + i.quantity + '</span></span><span class="v">' + inr(i.netPaise) + "</span></button>"; }).join("") + "</div>" +
-      '<p class="muted small">' + esc(pk.delivery.label) + " · " + (pk.delivery.feePaise ? inr(pk.delivery.feePaise) : "Free") + (pk.carrier ? " · " + esc(pk.carrier) + " " + esc(pk.trackingNumber || "") : "") + "</p>" + (pk.status === "delivered" ? rateBoxHTML(pk, rc) : "") +
-      (o.paymentStatus !== "unpaid" && o.status !== "cancelled" && (pk.status === "confirmed" || pk.status === "processing") ? '<button class="btn danger sm" data-a="pcancel" data-i="' + esc(o.id) + '" data-j="' + esc(pk.id) + '">' + (UI.confirm === pk.id ? "Tap again to cancel this package" : "Cancel this package") + "</button>" : "");
+    out += '<section class="ccard"><div class="ccard-h">' + ico("store") + "<b>" + esc(pk.sellerName) + '</b><span class="pill ' + stClass(pk.status) + '">' + esc(stLabel(pk.status)) + "</span></div>" +
+      pk.items.map(function (i) { return '<button class="citem" data-a="item" data-i="' + esc(i.productId) + '"><span class="citem-ph">' + ph(i.title, i.productId, i.coverImageId, 200) + '</span><span class="citem-b"><b class="clip">' + esc(i.title) + '</b><span class="muted small">' + esc(variantLabel(i.options)) + " × " + i.quantity + '</span><span class="price">' + inr(i.netPaise) + "</span></span></button>"; }).join("") +
+      '<p class="muted small pk-del">' + ico("truck") + esc(pk.delivery.label) + " · " + (pk.delivery.feePaise ? inr(pk.delivery.feePaise) : "Free") + (pk.carrier ? " · " + esc(pk.carrier) + " " + esc(pk.trackingNumber || "") : "") + "</p>" + (pk.status === "delivered" ? rateBoxHTML(pk, rc) : "") +
+      (o.paymentStatus !== "unpaid" && o.status !== "cancelled" && (pk.status === "confirmed" || pk.status === "processing") ? '<button class="linkbtn danger-link" data-a="pcancel" data-i="' + esc(o.id) + '" data-j="' + esc(pk.id) + '">' + (UI.confirm === pk.id ? "Tap again to cancel this package" : "Cancel this package") + "</button>" : "") + "</section>";
   });
-  out += '<div style="margin-top:14px">' + sum("Items", inr(t.itemsSubtotalPaise)) + (t.discountPaise ? sum("Coupon discount", "−" + inr(t.discountPaise)) : "") + sum("Delivery", t.deliveryPaise ? inr(t.deliveryPaise) : "Free") + sum("Buyer Protection", inr(t.buyerProtectionPaise)) + sum("Total", inr(t.totalPaise), "total") + "</div>" +
-    '<p class="muted small">Deliver to: ' + esc(a.name) + ", " + esc(a.line1) + (a.line2 ? ", " + esc(a.line2) : "") + ", " + esc(a.city) + ", " + esc(a.state) + " " + esc(a.pincode) + "</p>";
-  if (unpaid) out += '<button class="btn danger block" data-a="ocancel" data-i="' + esc(o.id) + '">' + (UI.confirm === o.id ? "Tap again to cancel the order" : "Cancel order") + "</button>";
-  else if (o.paymentStatus !== "unpaid" && o.status !== "cancelled" && o.status !== "shipped" && o.status !== "delivered") out += '<button class="btn danger block" data-a="ocancel" data-i="' + esc(o.id) + '">' + (UI.confirm === o.id ? "Tap again to cancel the order" : "Cancel order") + "</button>";
+  out += '<section class="ccard"><div class="ccard-h">' + ico("pin") + "<b>Delivering to</b></div><p class=\"addr-p\"><b>" + esc(a.name) + "</b><br>" + addrText(a) + "</p></section>";
+  out += '<section class="ccard"><div class="ccard-h"><b>Payment summary</b></div>' + totalsHTML(t) + "</section>";
   var hist = o.packages.reduce(function (a2, pk) { return a2.concat((pk.history || []).map(function (h) { return { h: h, pk: pk.number }; })); }, []).sort(function (x, y) { return new Date(y.h.at) - new Date(x.h.at); });
-  if (hist.length) out += '<h3 style="margin:18px 0 6px">History</h3><div class="list">' + hist.map(function (x) { return '<div class="row"><span class="l">' + esc(stLabel(x.h.to)) + '<br><span class="muted small">' + esc(x.pk) + " · " + when(x.h.at) + (x.h.reason ? " · " + esc(x.h.reason) : "") + "</span></span></div>"; }).join("") + "</div>";
+  if (hist.length) out += '<section class="ccard"><div class="ccard-h">' + ico("clock") + '<b>History</b></div><ol class="timeline">' + hist.map(function (x) { return "<li><b>" + esc(stLabel(x.h.to)) + '</b><span class="muted small">' + esc(x.pk) + " · " + when(x.h.at) + (x.h.reason ? " · " + esc(x.h.reason) : "") + "</span></li>"; }).join("") + "</ol></section>";
+  if (unpaid || (o.paymentStatus !== "unpaid" && o.status !== "cancelled" && o.status !== "shipped" && o.status !== "delivered")) out += '<p class="sl-danger"><button data-a="ocancel" data-i="' + esc(o.id) + '">' + (UI.confirm === o.id ? "Tap again to cancel the order" : "Cancel order") + "</button></p>";
   return out;
 };
 V.wish = function () {
   if (!signedIn()) return V.gate("Favourite items", "Sign in to save items you like.");
   var v = Object.keys(S.wish).map(function (k) { var w = S.wish[k]; return { id: w.productId, title: w.title, minPricePaise: w.minPricePaise, coverImageId: w.coverImageId, inStock: w.inStock, condition: "", brandName: "" }; });
-  return head("Favourite items", true) + (v.length ? '<div class="grid">' + v.map(function (i) { var f = card(i); return f.replace(/<div class="m">.*?<\/div>/, ""); }).join("") + "</div>" : '<div class="empty"><h2>No favourites yet</h2>Tap the heart on an item to save it.</div>');
+  return head("Favourites", true) + (v.length ? '<div class="grid">' + v.map(function (i) { var f = card(i); return f.replace(/<div class="m">.*?<\/div>/, ""); }).join("") + "</div>" : '<div class="empty"><span class="empty-ic">' + ico("heart") + '</span><h2>No favourites yet</h2>Tap the heart on an item to save it here.<div style="margin-top:14px"><button class="btn" data-a="tab" data-i="home">Find something</button></div></div>');
 };
 V.profile = function () {
-  if (!signedIn()) return head("Profile") + '<div class="empty"><h2>Welcome to Reloved</h2>Sign in to see your orders, favourites and addresses.<div style="margin-top:12px"><button class="btn" data-a="go" data-i="auth">Sign in or create account</button></div></div>' + docRows();
-  var u = S.user, roles = (u.roles || []).filter(function (r) { return r !== "customer"; });
-  return '<div class="bar"><span class="av" style="background:var(--accent);color:var(--accent-ink)">' + esc(String(u.fullName || u.email).slice(0, 1).toUpperCase()) + '</span><div style="flex:1;min-width:0"><h2>' + esc(u.fullName || "Your account") + '</h2><span class="muted small">' + esc(u.email) + "</span>" + roles.map(function (r) { return ' <span class="pill ok">' + esc(r) + "</span>"; }).join("") + "</div></div>" +
-    '<div class="list">' + row("O", "My orders", "", 'data-a="go" data-i="orders"') + ((u.roles || []).indexOf("seller") > -1 ? row("$", "Seller dashboard", "", 'data-a="tab" data-i="sell"') : "") + (S.perms.length ? row("★", "Admin", "", 'data-a="go" data-i="admin"') : "") + row("♥", "Favourite items", Object.keys(S.wish).length || "", 'data-a="go" data-i="wish"') + row("A", "My addresses", "", 'data-a="go" data-i="addresses"') + row("S", "Settings", "", 'data-a="go" data-i="settings"') + "</div>" + docRows();
+  if (!signedIn()) return head("Profile") + '<section class="phero"><span class="av av-lg">' + ico("user") + '</span><h2>Welcome to Reloved</h2><p class="muted">Sign in to see your orders, favourites and addresses, or to start selling.</p><button class="btn" data-a="go" data-i="auth">Sign in or create account</button></section>' + docRows();
+  var u = S.user, roles = (u.roles || []).filter(function (r) { return r !== "customer"; }), nw = Object.keys(S.wish).length, seller = (u.roles || []).indexOf("seller") > -1;
+  return '<div class="narrow"><section class="phero"><span class="av av-lg" style="background:var(--accent);color:var(--accent-ink)">' + esc(String(u.fullName || u.email).slice(0, 1).toUpperCase()) + '</span><h2>' + esc(u.fullName || "Your account") + '</h2><p class="muted small">' + esc(u.email) + "</p>" + (roles.length ? '<div class="roles">' + roles.map(function (r) { return '<span class="pill ok">' + esc(r.charAt(0).toUpperCase() + r.slice(1)) + "</span>"; }).join("") + "</div>" : "") + "</section>" +
+    '<div class="qtiles"><button data-a="go" data-i="orders">' + ico("box") + '<span>Orders</span></button><button data-a="go" data-i="wish">' + ico("heart") + "<span>Favourites" + (nw ? " · " + nw : "") + '</span></button><button data-a="go" data-i="addresses">' + ico("pin") + "<span>Addresses</span></button></div>" +
+    group("Selling", seller ? row("store", "Seller dashboard", "", 'data-a="tab" data-i="sell"') : row("store", "Start selling", "Get verified once", 'data-a="tab" data-i="sell"')) +
+    (S.perms.length ? group("Admin", row("star", "Admin tools", "", 'data-a="go" data-i="admin"')) : "") +
+    group("Account", row("gear", "Settings", "", 'data-a="go" data-i="settings"') + row("moon", "Light or dark theme", "", 'data-a="theme"')) + docRows() + "</div>";
 };
 function docRows() {
-  return '<div class="list">' + row("?", "How it works", "", 'data-a="go" data-i="doc" data-j="how"') + row("i", "Help Centre", "", 'data-a="go" data-i="help"') + row("§", "Terms &amp; legal", "", 'data-a="go" data-i="legal"') + row("A", "About us", "", 'data-a="go" data-i="about"') + "</div>";
+  return group("Help and info", row("help", "How it works", "", 'data-a="go" data-i="doc" data-j="how"') + row("chat", "Help Centre", "", 'data-a="go" data-i="help"') + row("doc", "Terms &amp; legal", "", 'data-a="go" data-i="legal"') + row("info", "About us", "", 'data-a="go" data-i="about"'));
 }
 V.settings = function () {
   if (!signedIn()) return V.gate("Settings", "Sign in to change your settings.");
   var u = S.user;
-  return head("Settings", true) + '<label class="field"><span>Full name</span><input class="inp" id="setn" maxlength="80" value="' + esc(u.fullName || "") + '"></label><button class="btn block" data-a="savename">Save name</button>' +
+  return head("Settings", true) +
+    '<section class="ccard"><div class="ccard-h">' + ico("user") + '<b>Your name</b></div><label class="field"><span>Full name</span><input class="inp" id="setn" maxlength="80" value="' + esc(u.fullName || "") + '"></label><button class="btn" data-a="savename">Save name</button></section>' +
     (window.RL && RL.socialSettings ? RL.socialSettings() : "") +
-    (u.hasPassword === false ? "" : '<h3 style="margin:18px 0 6px">Change password</h3><label class="field"><span>Current password</span><input class="inp" id="pw0" type="password" autocomplete="current-password"></label><label class="field"><span>New password (at least 10 characters)</span><input class="inp" id="pw1" type="password" autocomplete="new-password"></label><button class="btn ghost block" data-a="savepw">Change password</button>') +
-    '<div class="list" style="margin-top:18px">' + row("T", "Light / dark theme", "", 'data-a="theme"') + row("+", "Install app", "", 'data-a="install"') + row("O", "Sign out", "", 'data-a="signout"') + row("X", "Sign out everywhere", "", 'data-a="signoutall"') + "</div>" +
-    '<div class="list" style="margin-top:14px">' + row("B", "Blocked users", "", 'data-a="go" data-i="blocked"') + row("!", "Delete my account", "", 'data-a="go" data-i="delacct"') + "</div>";
+    (u.hasPassword === false ? "" : '<section class="ccard"><div class="ccard-h">' + ico("shield") + '<b>Password</b></div><label class="field"><span>Current password</span><input class="inp" id="pw0" type="password" autocomplete="current-password"></label><label class="field"><span>New password (at least 10 characters)</span><input class="inp" id="pw1" type="password" autocomplete="new-password"></label><button class="btn ghost" data-a="savepw">Change password</button></section>') +
+    group("App", row("moon", "Light or dark theme", "", 'data-a="theme"') + row("download", "Install app", "", 'data-a="install"')) +
+    group("Privacy", row("block", "Blocked users", "", 'data-a="go" data-i="blocked"')) +
+    group("Sign out", row("logout", "Sign out", "", 'data-a="signout"') + row("logout", "Sign out everywhere", "", 'data-a="signoutall"')) +
+    '<p class="sl-danger"><button data-a="go" data-i="delacct">Delete my account</button></p>';
 };
 var DOCS = {
   how: ["How it works", "Browse or search for items and add what you like to your cart. At checkout choose a delivery address and place the order. Buyer Protection is added to every order. Sellers pack and ship their own items, and you can follow each package on the order page. If something arrives damaged or fake you can ask for a return within 7 days of delivery."],
@@ -691,7 +764,7 @@ V.help = function () {
   return head("Help Centre", true) + (api.isApp ? "" : '<button class="btn block" data-a="nova" style="margin-bottom:12px">Chat with us</button>') + '<div class="list">' + q.map(function (x) { return '<div class="row" style="display:block"><b>' + x[0] + '</b><br><span class="muted">' + x[1] + "</span></div>"; }).join("") + "</div>";
 };
 V.about = function () { return head("About", true) + '<div class="list">' + [["Our platform", "platform"], ["How it works", "how"], ["Trust and Safety", "trust"]].map(function (t) { return row("i", t[0], "", 'data-a="go" data-i="doc" data-j="' + t[1] + '"'); }).join("") + "</div>"; };
-V.legal = function () { return head("Terms &amp; legal", true) + '<div class="list">' + row("§", "User Terms and Conditions", "", 'data-a="go" data-i="tc"') + row("§", "Privacy Centre", "", 'data-a="go" data-i="doc" data-j="privacy"') + '<a class="row" href="'+(window.APP_CONFIG.SITE||"")+'/privacy.html" target="_blank" rel="noopener"><span class="ic">§</span><span class="l">Full Privacy Policy</span><span class="chev"></span></a><a class="row" href="'+(window.APP_CONFIG.SITE||"")+'/terms.html" target="_blank" rel="noopener"><span class="ic">§</span><span class="l">Terms of Use</span><span class="chev"></span></a>' + "</div>"; };
+V.legal = function () { return head("Terms &amp; legal", true) + '<div class="list">' + row("§", "User Terms and Conditions", "", 'data-a="go" data-i="tc"') + row("§", "Privacy Centre", "", 'data-a="go" data-i="doc" data-j="privacy"') + '<a class="row" href="'+(window.APP_CONFIG.SITE||"")+'/privacy.html" target="_blank" rel="noopener"><span class="ic">' + ico("doc") + '</span><span class="l">Full Privacy Policy</span><span class="chev"></span></a><a class="row" href="'+(window.APP_CONFIG.SITE||"")+'/terms.html" target="_blank" rel="noopener"><span class="ic">' + ico("doc") + '</span><span class="l">Terms of Use</span><span class="chev"></span></a>' + "</div>"; };
 V.tc = function () {
   return head("User Terms and Conditions", true) + '<div class="doc"><h3>1. About you and us</h3><p>Who runs the service and what the defined terms mean.</p><h3>2. Your account</h3><p>Keep your account secure and report unauthorised use. Members must be 18 or over.</p><h3>3. Buying</h3><p>Prices include GST. Delivery and Buyer Protection fees are shown before you order. Pay only through the app to keep Buyer Protection.</p><h3>4. Selling</h3><p>Sellers are verified before they can sell. List only items you own and describe them honestly. Counterfeit, illegal or unsafe items are not allowed.</p><h3>5. Cancellations and returns</h3><p>A paid package can be cancelled until it ships. Returns are accepted within 7 days of delivery for damaged or fake items only.</p><p class="small">Summary for the trial. Not legal advice.</p></div>';
 };
@@ -991,7 +1064,7 @@ function start() {
 }
 // A photo that fails to load is removed so the colour placeholder shows. Done here, not with an inline onerror attribute, because the site's Content-Security-Policy forbids inline handlers.
 document.addEventListener("error", function (ev) { var t = ev.target; if (t && t.tagName === "IMG" && t.hasAttribute("data-rm")) t.remove(); }, true);
-window.RL = { V: V, A: {}, E: {}, PCAT: PCAT, paintNav: renderNav, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, afterAuth: afterAuth, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
+window.RL = { ico: ico, V: V, A: {}, E: {}, PCAT: PCAT, paintNav: renderNav, S: S, UI: UI, C: C, hooks: [], esc: esc, inr: inr, when: when, $: $, val: val, uuid: uuid, COND: COND, stLabel: stLabel, stClass: stClass, variantLabel: variantLabel, hueOf: hueOf, ph: ph, toast: toast, errText: errText, checkRules: checkRules, serverFieldErrors: serverFieldErrors, showFieldErrors: showFieldErrors, clearFieldErrors: clearFieldErrors, PH_RE: PH_RE, PIN_RE: PIN_RE, row: row, head: head, sum: sum, sw: sw, go: go, back: back, render: render, refresh: refresh, need: need, drop: drop, signedIn: signedIn, loadMe: loadMe, afterAuth: afterAuth, loadCats: loadCats, loadFeed: loadFeed, loadingBox: loadingBox, failBox: failBox, probText: probText, setTab: setTab,
   current: function () { return cur(); }, canBack: function () { return stack.length > 0; }, replace: replace, itemUrl: itemUrl };
 boot();
 window.__reloved = { S: S, UI: UI };

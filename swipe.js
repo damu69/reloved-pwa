@@ -84,11 +84,11 @@ V.discover = function () {
     stage = '<div class="empty"><h2>You have seen everything</h2>New listings show up here as sellers add them.<div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn" data-a="dkreset">Start over</button><button class="btn ghost" data-a="tab" data-i="home">Browse the grid</button></div></div>';
   }
   var has = D.items.length > 0, canUndo = D.hist.length > 0;
-  return '<div class="dk"><div class="dk-head"><h1>Discover</h1></div><div class="chips">' + chips + "</div>" +
+  return '<div class="dk"><div class="dk-head"><h1>Discover</h1><span class="muted small">Swipe through new listings</span></div><div class="chips">' + chips + "</div>" +
     '<div class="dk-stage" id="dkstage">' + stage + "</div>" +
     '<div class="dk-actions"><button class="rb sm" data-a="dkundo" aria-label="Undo"' + (canUndo ? "" : " disabled") + ">" + BTN.undo + '</button><button class="rb skip" data-a="dkskip" aria-label="Skip"' + (has ? "" : " disabled") + ">" + BTN.skip +
     '</button><button class="rb save" data-a="dksave" aria-label="Save to favourites"' + (has ? "" : " disabled") + ">" + BTN.save + '</button><button class="rb chat" data-a="dkchat" aria-label="Message seller"' + (has ? "" : " disabled") + ">" + BTN.chat + "</button></div>" +
-    '<p class="dk-hint">Swipe right to message the seller · left to skip · up to save</p></div>' + (D.sheet ? sheetHTML(D.sheet) : "");
+    '<p class="dk-hint"><span>' + BTN.skip + 'Skip</span><span>' + BTN.save + 'Save</span><span>' + BTN.chat + 'Message</span></p></div>' + (D.sheet ? sheetHTML(D.sheet) : "");
 };
 R.E.discover = function () { if (!D.loaded && !D.loading) loadDeck(false); else if (D.items.length < 6 && D.next && !D.loading) loadDeck(true); };
 
@@ -214,7 +214,7 @@ function ago(iso) {
   if (m < 10080) return Math.floor(m / 1440) + "d";
   try { return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" }); } catch (e) { return ""; }
 }
-function avatar(name) { return '<span class="av" style="background:' + ["#4a4036", "#3c4a3d", "#3b4552", "#52403f", "#4c4a36", "#3a4c4a"][R.hueOf(name) % 6] + '">' + esc(String(name || "?").slice(0, 1).toUpperCase()) + "</span>"; }
+function avatar(name) { return '<span class="av" style="background:hsl(' + R.hueOf(name) + ',32%,42%)">' + esc(String(name || "?").slice(0, 1).toUpperCase()) + "</span>"; }
 V.inbox = function () {
   if (!R.signedIn()) return V.gate("Inbox", "Sign in to message sellers and see your chats.");
   var c = R.need("chats", function () { return api.get("/chat/conversations"); });
@@ -222,9 +222,10 @@ V.inbox = function () {
   if (c.st === "err") return head("Inbox") + R.failBox(c.err);
   var list = c.data.items || [];
   if (!list.length) return head("Inbox") + '<div class="empty"><h2>No chats yet</h2>Swipe right on something you like in Discover, or tap Message seller on an item.<div style="margin-top:14px"><button class="btn" data-a="tab" data-i="discover">Go to Discover</button></div></div>';
-  return head("Inbox") + '<div class="list">' + list.map(function (x) {
-    return '<button class="row chatrow' + (x.unread ? " unread" : "") + '" data-a="chat" data-i="' + esc(x.id) + '">' + avatar(x.otherName) +
-      '<span class="l"><span class="chat-top"><b>' + esc(x.otherName) + '</b><span class="muted small">' + ago(x.lastMessageAt) + '</span></span><span class="muted small chat-item">' + esc(x.productTitle) + '</span><span class="chat-prev">' + esc(x.lastMessagePreview || "No messages yet") + "</span></span>" +
+  var un = list.filter(function (x) { return x.unread; }).length;
+  return head("Inbox" + (un ? ' <span class="hcount">' + un + " unread</span>" : "")) + '<div class="chatlist">' + list.map(function (x) {
+    return '<button class="chatrow' + (x.unread ? " unread" : "") + '" data-a="chat" data-i="' + esc(x.id) + '">' + avatar(x.otherName) +
+      '<span class="l"><span class="chat-top"><b>' + esc(x.otherName) + '</b><span class="chat-time">' + ago(x.lastMessageAt) + '</span></span><span class="chat-item">' + esc(x.productTitle) + '</span><span class="chat-prev">' + esc(x.lastMessagePreview || "No messages yet") + "</span></span>" +
       (x.unread ? '<i class="dot">' + (x.unread > 9 ? "9+" : x.unread) + "</i>" : "") + "</button>";
   }).join("") + "</div>";
 };
@@ -272,11 +273,12 @@ V.chat = function (id) {
   if (CH.err) return head("Chat", true) + R.failBox(CH.err, "chatretry");
   if (!CH.loaded) return head("Chat", true) + R.loadingBox();
   var c = CH.conv;
-  return head(esc(c.otherName), true) +
-    '<button class="itemcard" data-a="item" data-i="' + esc(c.productId) + '">' + ph(c.productTitle, c.productId, c.coverImageId, 200) + '<span style="flex:1;min-width:0"><b class="clip">' + esc(c.productTitle) + '</b><span class="muted small clip">' + (c.role === "buyer" ? "You are asking about this item" : "Asking about this item") + '</span></span><span class="chev"></span></button>' +
-    '<div class="chat-safe"><button data-a="go" data-i="report" data-j="conversation:' + esc(c.id) + '">Report</button><button data-a="chatblock">Block ' + esc(c.otherName) + '</button></div>' +
+  var I = R.ico;
+  return '<div class="chathead"><button class="back" data-a="back" aria-label="Back"><span class="chev" style="transform:rotate(-135deg);margin-left:4px"></span></button>' + avatar(c.otherName) + '<span class="ch-name"><b class="clip">' + esc(c.otherName) + '</b><span class="muted small">' + (c.role === "buyer" ? "Seller" : "Buyer") + '</span></span>' +
+    '<button class="iconbtn" data-a="go" data-i="report" data-j="conversation:' + esc(c.id) + '" aria-label="Report this chat">' + I("flag") + '</button><button class="iconbtn" data-a="chatblock" aria-label="Block ' + esc(c.otherName) + '">' + I("block") + "</button></div>" +
+    '<button class="chatitem" data-a="item" data-i="' + esc(c.productId) + '">' + ph(c.productTitle, c.productId, c.coverImageId, 200) + '<span class="l"><b class="clip">' + esc(c.productTitle) + '</b><span class="muted small clip">' + (c.role === "buyer" ? "You are asking about this item" : "Asking about this item") + '</span></span><span class="chev"></span></button>' +
     '<div class="msgs" id="msgs">' + bubbles() + "</div>" +
-    '<form class="composer" id="chatf"><textarea class="inp" id="chat_in" rows="1" maxlength="1000" placeholder="Write a message" aria-label="Message">' + esc(CH.draft) + '</textarea><button class="btn" type="submit"' + (CH.sending ? " disabled" : "") + ">Send</button></form>";
+    '<form class="composer" id="chatf"><textarea class="inp" id="chat_in" rows="1" maxlength="1000" placeholder="Write a message" aria-label="Message">' + esc(CH.draft) + '</textarea><button class="sendbtn" type="submit" aria-label="Send"' + (CH.sending ? " disabled" : "") + '><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2-6z"/></svg></button></form>';
 };
 A.chatblock = async function () { if (!CH.conv || !CH.conv.otherUserId) return; await A.blockuser(CH.conv.otherUserId); };
 A.chatretry = function () { var id = CH.id; CH = { id: null }; R.replace("chat", id); };

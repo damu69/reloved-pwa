@@ -7,21 +7,23 @@
 web
 
 ## Users
-Buyers and sellers are equally first-class. Buyers (Indian shoppers) browse and order pre-owned fashion and more, mostly on phones. Sellers sign up, list items, manage stock and fulfil orders. An admin role exists in the codebase.
+Buyers and sellers are equally first-class. Buyers (Indian shoppers) browse and order pre-owned fashion and more, mostly on phones. Sellers sign up, list items, manage stock and fulfil orders. Admins review sellers, listings and reports.
 
 ## Product Purpose
-Reloved is a marketplace for pre-owned items, with preloved fashion first, sold by verified Indian sellers. Success is buyers finding and trusting good items, and sellers listing and selling them with little friction.
+Reloved is a thrift marketplace for pre-owned items in India, sold by verified Indian sellers. Clothing is the largest category, alongside bags, shoes, watches, sunglasses, jewellery and some home decor. Success is buyers finding and trusting good items, and sellers listing and selling them with little friction.
 
 ## Positioning
-Curated preloved fashion: the offer is quality-checked fashion, not an open classifieds board. (Confirmed by the user; seller verification is also in the page title.)
+A general thrift marketplace for India where every seller is verified (KYC and admin approval) and every listing is reviewed before it goes live. Confirmed by the user: not limited to fashion. The Gender field (Women, Men, Girls, Boys) is a product attribute and filter, not a category.
 
 ## Operating Context
 Installable PWA (service worker, manifest) in plain HTML, CSS and JavaScript, no framework. Talks to a Fastify and Postgres (Supabase) API under `/api/v1`, deployed on Vercel. Includes swipe discovery, seller and admin screens, safety, social and showcase modules. Legal pages: terms, privacy, delete-account.
 
 ## Capabilities and Constraints
-- Platform is web now; a native app is planned later, so keep product logic and content portable.
-- Stack stays vanilla HTML/CSS/JS.
-- README says selling, orders, returns, admin, online payments and notifications are "not available yet", but `seller.js` and `admin.js` exist; actual status is undecided and should be checked before claiming features.
+- Platform is web now, also shipped as an Android app that bundles the site (Capacitor); a native iOS app is not planned yet. Keep product logic and content portable.
+- Stack stays vanilla HTML/CSS/JS (no framework).
+- Live: browse, search and filters (including Gender), item pages, cart, checkout through to an unpaid order, seller application with KYC, seller listings, sizes and stock, admin screens (sellers, products, categories, commission, ratings, reports), chat and swipe discovery, seller ratings, safety and reports, Google and Facebook sign-in.
+- Not switched on yet: online payments (Razorpay), email and push notifications, payouts. Checkout ends at "order placed, payment not switched on".
+- Categories are one flat list of item types (Dresses, Jeans, Sneakers, Watches...). Gender is chosen separately on each product.
 - `db.js`, `schema.sql`, `security.sql` are legacy prototype files, unused.
 
 ## Brand Commitments

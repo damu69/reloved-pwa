@@ -14,7 +14,7 @@ function stLabel(s) { return ORDER_ST[s] || String(s || "").replace(/_/g, " "); 
 function stClass(s) { return s === "delivered" ? "ok" : s === "cancelled" ? "bad" : "prog"; }
 function variantLabel(o) { var v = o && Object.keys(o).map(function (k) { return o[k]; }); return v && v.length ? v.join(" / ") : "Standard"; }
 function hueOf(s) { var h = 0; s = String(s || ""); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h; }
-var TONES = ["#3a342e", "#32382f", "#2f353b", "#3b3135", "#3b3829", "#2d3a37", "#3a2f2b", "#33313f"];
+var TONES = ["var(--t0)", "var(--t1)", "var(--t2)", "var(--t3)", "var(--t4)", "var(--t5)", "var(--t6)", "var(--t7)"];
 var ICONS = {
   tee: "M21 10l-13 8 6 9 7-4v27h20V23l7 4 6-9-13-8c-2 4-6 6-10 6s-8-2-10-6z",
   dress: "M26 7h12l1 14-5 4 14 31H16l14-31-5-4zM26 7l1 7M38 7l-1 7M28 25h8",
@@ -323,7 +323,7 @@ function card(i) {
   // A real link, so search engines and the site crawler can follow it and people can open it in a new tab.
   return '<div><a class="card" href="' + esc(itemUrl(i.id, i.title)) + '" data-a="item" data-i="' + esc(i.id) + '" aria-label="' + esc(i.title) + '">' +
     ph(i.title, i.id, i.coverImageId, 600, tag + '<span class="heart' + (f ? " on" : "") + '" data-a="fav" data-i="' + esc(i.id) + '" role="button" aria-label="Favourite" aria-pressed="' + f + '">' + HEART + "</span>", null, photoAlt(i.title, i.brandName, i.condition)) +
-    '<div class="t">' + esc(i.title) + '</div><div class="m">' + esc([COND[i.condition] || i.condition, i.brandName].filter(Boolean).join(" · ")) + '</div><div class="price">' + inr(i.minPricePaise) + "</div></a></div>";
+    '<div class="price">' + inr(i.minPricePaise) + '</div><div class="t">' + esc(i.title) + '</div><div class="m">' + esc([COND[i.condition] || i.condition, i.brandName].filter(Boolean).join(" · ")) + "</div></a></div>";
 }
 function gridHTML() {
   var F = UI.feed;
@@ -340,9 +340,10 @@ function countText() {
 }
 function partialFeed() {
   var g = $("grid"), m = $("more"), c = $("count"), a = $("actives"), b = $("fbtn");
-  var dr = $("drops"); if (dr) dr.innerHTML = dropsHTML();
+  var hf = $("hbfan"); if (hf) hf.innerHTML = fanHTML();
+  var cr = $("cats"); if (cr) cr.innerHTML = catCirclesHTML();
   if (g) g.innerHTML = gridHTML(); if (m) m.innerHTML = moreHTML(); if (c) c.textContent = countText(); if (a) a.innerHTML = activesHTML();
-  if (b) { var nf = filterCount(); b.textContent = "Filters" + (nf ? " (" + nf + ")" : ""); b.classList.toggle("on", UI.fil || !!nf); }
+  if (b) { var nf = filterCount() - (UI.gender ? 1 : 0); b.innerHTML = FILTER_ICON + (nf ? '<i class="dot">' + nf + "</i>" : ""); b.setAttribute("aria-label", "Filters" + (nf ? ", " + nf + " on" : "")); b.classList.toggle("on", UI.fil || !!nf); }
 }
 // Breadcrumbs (Home / Women / Sarees), as on Vinted and Foot Locker listing and product pages. `current` marks the last
 // category as the page itself instead of a link.
@@ -385,30 +386,37 @@ function activesHTML() {
   return out.length ? out.join("") + '<button class="linkbtn" data-a="filclear">Clear all</button>' : "";
 }
 
-// Why buy here: one short block above the grid on the plain home screen (Vinted opens with a pitch, the big stores with a campaign).
-function introHTML() {
-  return '<section class="intro"><h2>Preloved, checked, protected.</h2><ul>' +
-    "<li><b>Verified sellers.</b> Every seller is checked before they can sell, and every listing is reviewed.</li>" +
-    "<li><b>Buyer Protection</b> on every order. Damaged or fake? Return it within 7 days.</li>" +
-    "<li><b>Indian closets.</b> Kurtas, sarees, sneakers and more, priced in rupees.</li></ul>" +
-    '<div class="intro-cta"><a class="btn ghost sm" href="/home/doc/how" data-a="go" data-i="doc" data-j="how">How it works</a><a class="btn sm" href="/sell" data-a="tab" data-i="sell">Sell your clothes</a></div></section>';
-}
-
-// ---- Home showcase: layout taken from the Nike and Foot Locker home pages (hero carousel, category tiles, a "fresh drops"
-// rail, a brand grid, an app banner and a footer), with Reloved's own words and colour panels instead of photos. ----
-var HERO = [
-  { k: "a", h: "Preloved, checked, protected.", p: "Verified sellers and Buyer Protection on every order.", b: "Shop now", a: 'data-a="scrolllist"' },
-  { k: "b", h: "Clear out your closet.", p: "List what you no longer wear and reach buyers across India.", b: "Start selling", a: 'data-a="tab" data-i="sell"' },
-  { k: "c", h: "Swipe to find your next favourite.", p: "Right to message the seller, left to skip.", b: "Open Discover", a: 'data-a="tab" data-i="discover"' }
-];
+// ---- Home: one banner (copy plus a fan of the newest listings), trust points, round category photos, then the single
+// listing grid. Photos come from the feed, so the page shows real items as soon as sellers add photos. ----
 var ICON_PREV = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>', ICON_NEXT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
+var SEARCH_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+var FILTER_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>';
+function svgI(d) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + "</svg>"; }
+function fanHTML() {
+  var L = UI.feed.items.slice(0, 3);
+  if (L.length < 3) return "";
+  return L.map(function (i) { return '<a href="' + esc(itemUrl(i.id, i.title)) + '" data-a="item" data-i="' + esc(i.id) + '" tabindex="-1">' + ph(i.title, i.id, i.coverImageId, 200, "<span>" + inr(i.minPricePaise) + "</span>", i.categoryPath, "") + "</a>"; }).join("");
+}
 function heroHTML() {
-  return '<section class="hero" aria-roledescription="carousel" aria-label="Highlights"><div class="hero-track" id="herotrack" tabindex="0">' +
-    HERO.map(function (s, n) {
-      return '<div class="hero-slide hs-' + s.k + '" role="group" aria-roledescription="slide" aria-label="' + (n + 1) + " of " + HERO.length + '"><div class="hero-copy"><h2>' + esc(s.h) + "</h2><p>" + esc(s.p) + '</p><button class="btn pill-btn" ' + s.a + ">" + esc(s.b) + "</button></div></div>";
-    }).join("") + '</div><div class="hero-ctl"><span class="hero-dots" id="herodots">' + HERO.map(function (s, n) { return "<i" + (n ? "" : ' class="on"') + "></i>"; }).join("") + "</span>" +
-    '<button class="rnd" data-hero="pause" id="heropause" aria-label="Pause slides"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg></button>' +
-    '<button class="rnd" data-hero="prev" aria-label="Previous slide">' + ICON_PREV + '</button><button class="rnd" data-hero="next" aria-label="Next slide">' + ICON_NEXT + "</button></div></section>";
+  return '<section class="hb" aria-label="Welcome"><div><span class="hb-k">' + svgI('<path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>') + "Verified sellers only</span>" +
+    "<h2>Preloved, checked, protected.</h2><p>Kurtas, sarees, sneakers and more from closets across India.</p>" +
+    '</div><div class="hb-fan" id="hbfan" aria-hidden="true">' + fanHTML() + "</div>" +
+    '<div class="hb-cta"><button class="btn" data-a="scrolllist">Shop now</button><a class="btn ghost" href="/sell" data-a="tab" data-i="sell">Sell an item</a></div></section>';
+}
+function trustHTML() {
+  function t(icon, label) { return '<a href="/home/doc/how" data-a="go" data-i="doc" data-j="how">' + svgI(icon) + esc(label) + "</a>"; }
+  return '<div class="trustrow">' + t('<path d="M20 6L9 17l-5-5"/>', "Every listing reviewed") + t('<path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/>', "7-day Buyer Protection") + t('<path d="M7 5h10M7 9h10M13 9c0 3-2 5-6 5l7 6"/>', "Prices in rupees") + "</div>";
+}
+function catCirclesHTML() {
+  var pic = {}; UI.feed.items.forEach(function (i) { var k = i.categoryPath; if (!pic[k] || (!pic[k].coverImageId && i.coverImageId)) pic[k] = i; });
+  return topCats().map(function (c) {
+    var i = pic[c.path];
+    return '<a class="cat" href="' + esc(catUrl(c.path)) + '" data-a="browse" data-i="' + esc(c.path) + '" data-j="reset">' + ph(c.name, i ? i.id : "", i ? i.coverImageId : null, 200, "", c.path, "") + "<span>" + esc(c.name) + "</span></a>";
+  }).join("");
+}
+function catSectionHTML() {
+  if (!topCats().length) return "";
+  return '<section class="sec"><div class="sec-h"><h2>Shop by category</h2></div><div class="cats" id="cats">' + catCirclesHTML() + "</div></section>";
 }
 function railWrap(title, id, inner) {
   return '<section class="sec"><div class="sec-h"><h2>' + esc(title) + '</h2><span class="rail-ctl"><button class="rnd" data-rail="prev" aria-label="Scroll left">' + ICON_PREV + '</button><button class="rnd" data-rail="next" aria-label="Scroll right">' + ICON_NEXT + '</button></span></div><div class="rail-track" ' + (id ? 'id="' + id + '"' : "") + ">" + inner + "</div></section>";
@@ -433,40 +441,17 @@ function sellerReviewsHTML() {
     d.distribution.map(function (x) { return '<div class="rv-bar"><span>' + x.stars + '★</span><i><u style="width:' + Math.round(x.count / max * 100) + '%"></u></i><span class="muted">' + x.count + "</span></div>"; }).join("") + "</div></div>" +
     (d.recent.some(function (x) { return x.comment; }) ? '<details class="rv-list"' + (d.recent.length <= 3 ? " open" : "") + "><summary>Buyer comments</summary>" + d.recent.filter(function (x) { return x.comment; }).map(function (x) { return '<div class="rv-item"><span class="stars"><i aria-hidden="true">' + "★".repeat(x.stars) + '</i></span> <b>' + esc(x.buyerName) + '</b> <span class="muted small">· ' + when(x.createdAt) + '</span><p>' + esc(x.comment) + "</p></div>"; }).join("") + "</details>" : "") + "</section>";
 }
-function dropsHTML() {
-  var F = UI.feed; if (!F.loaded || F.loading && !F.items.length) return skCards(6); if (!F.items.length) return '<div class="muted small" style="padding:8px 0">New listings will appear here.</div>';
-  return F.items.slice(0, 12).map(card).join("");
-}
-function catRailHTML() {
-  var tops = topCats(); if (!tops.length) return "";
-  return '<section class="sec"><div class="sec-h"><h2>Shop by category</h2><span class="rail-ctl"><button class="rnd" data-rail="prev" aria-label="Scroll left">' + ICON_PREV + '</button><button class="rnd" data-rail="next" aria-label="Scroll right">' + ICON_NEXT + '</button></span></div><div class="rail-track cat-rail">' +
-    tops.map(function (c) { var h = hueOf(c.name); return '<a class="cat-tile" href="' + esc(catUrl(c.path)) + '" data-a="browse" data-i="' + esc(c.path) + '" data-j="reset" style="background:' + TONES[h % TONES.length] + '"><span>' + esc(c.name) + "</span></a>"; }).join("") + "</div></section>";
-}
-function featuredHTML() {
-  return '<section class="sec"><div class="sec-h"><h2>Featured</h2></div><div class="feat">' +
-    '<a class="feat-tile ft-a" href="/sell" data-a="tab" data-i="sell"><span class="ft-k">For sellers</span><b>Sell what you no longer wear</b><span class="pill-btn btn sm">List an item</span></a>' +
-    '<a class="feat-tile ft-b" href="/discover" data-a="tab" data-i="discover"><span class="ft-k">For buyers</span><b>Swipe through new listings</b><span class="pill-btn btn sm">Discover</span></a></div></section>';
-}
-function trustTilesHTML() {
-  return '<section class="sec"><div class="sec-h"><h2>Why Reloved</h2></div><div class="trio">' +
-    '<a class="trio-tile tt-a" href="/home/doc/how" data-a="go" data-i="doc" data-j="how"><b>Verified sellers</b><span>Every seller is checked and every listing reviewed.</span></a>' +
-    '<a class="trio-tile tt-b" href="/home/doc/how" data-a="go" data-i="doc" data-j="how"><b>Buyer Protection</b><span>Damaged or fake? Return it within 7 days.</span></a>' +
-    '<a class="trio-tile tt-c" href="/home/doc/how" data-a="go" data-i="doc" data-j="how"><b>Priced in rupees</b><span>Indian closets, with delivery fees shown before you order.</span></a></div></section>';
-}
-function appBannerHTML() {
-  return '<section class="appban"><span class="appban-logo" aria-hidden="true">Re<em>loved</em></span><b>It&rsquo;s better on the app</b><button class="btn sm pill-btn" data-a="install">Install Reloved</button></section>';
-}
 function footerHTML() {
   var tops = topCats().slice(0, 6);
   return '<footer class="foot"><div class="foot-cols">' +
     "<div><h3>Shop</h3>" + (tops.length ? tops.map(function (c) { return '<a href="' + esc(catUrl(c.path)) + '" data-a="browse" data-i="' + esc(c.path) + '" data-j="reset">' + esc(c.name) + "</a>"; }).join("") : '<a href="/" data-a="browse" data-i="" data-j="reset">Just listed</a>') + "</div>" +
-    '<div><h3>Sell</h3><a href="/sell" data-a="tab" data-i="sell">Sell your clothes</a><a href="/discover" data-a="tab" data-i="discover">Discover</a></div>' +
+    '<div><h3>Sell</h3><a href="/sell" data-a="tab" data-i="sell">Sell your clothes</a><a href="/discover" data-a="tab" data-i="discover">Discover</a><button class="foot-install" data-a="install">Install the app</button></div>' +
     '<div><h3>Help</h3><a href="/home/doc/how" data-a="go" data-i="doc" data-j="how">How it works</a><a href="/home/help" data-a="go" data-i="help">Help Centre</a><a href="/home/about" data-a="go" data-i="about">About us</a></div>' +
     '<div><h3>Legal</h3><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a><a href="/delete-account.html">Delete account</a></div></div>' +
     '<p class="foot-note">&copy; ' + new Date().getFullYear() + " Reloved. Preloved fashion from verified Indian sellers.</p></footer>";
 }
-function showcaseHTML() {
-  return heroHTML() + catRailHTML() + railWrap("Fresh drops", "drops", dropsHTML()) + sellersRailHTML() + featuredHTML() + trustTilesHTML() + appBannerHTML();
+function sellBandHTML() {
+  return '<section class="sellband"><div><b>Clothes you no longer wear?</b><span>List them in a few minutes. Buyers across India.</span></div><a class="btn sm" href="/sell" data-a="tab" data-i="sell">Start selling</a></section>';
 }
 // Cart as a header icon on phones (the bottom bar has five tabs); on desktop it stays in the top bar.
 function cartLink() {
@@ -501,14 +486,19 @@ V.home = function () {
   if (UI.fil || (window.matchMedia && matchMedia("(min-width:900px)").matches)) loadBrands();
   var subchips = subs.length ? '<div class="chips">' + chip(top, "All " + ((catByPath(top) || {}).name || ""), UI.cat === top) +
     subs.map(function (c) { return chip(c.path, c.name, UI.cat === c.path); }).join("") + "</div>" : "";
-  var nf = filterCount(), plain = !UI.q.trim() && !UI.cat && !UI.sellerId && !nf;
+  // Gender has its own tabs, so picking Women keeps the home page (banner, categories) and only narrows the grid.
+  var nf = filterCount(), other = nf - (UI.gender ? 1 : 0), plain = !UI.q.trim() && !UI.cat && !UI.sellerId && !other;
+  var gtabs = '<div class="gtabs" role="tablist" aria-label="Shop for">' + [["", "All"]].concat(Object.keys(GENDERS).map(function (k) { return [k, GENDERS[k]]; })).map(function (g) {
+    var on = (UI.gender || "") === g[0]; return '<button role="tab" aria-selected="' + on + '" class="' + (on ? "on" : "") + '" data-a="gendertog" data-i="' + g[0] + '">' + g[1] + "</button>"; }).join("") + "</div>";
   return '<div class="homehead"><h1 class="brand">Re<em>loved</em></h1>' + cartLink() + "</div>" +
-    '<div class="searchrow"><div class="search" style="flex:1"><span class="muted">&#9906;</span><input id="q" type="search" placeholder="Search for items" value="' + esc(UI.q) + '" aria-label="Search"></div><button class="chip' + (UI.fil || nf ? " on" : "") + '" id="fbtn" data-a="fil" aria-expanded="' + UI.fil + '">Filters' + (nf ? " (" + nf + ")" : "") + "</button></div>" +
-    '<div class="chips catchips">' + chips + "</div>" + subchips +
-    (plain && !UI.fil ? showcaseHTML() : "") +
+    '<div class="searchrow"><div class="search" style="flex:1">' + SEARCH_ICON + '<input id="q" type="search" placeholder="Search kurtas, sneakers, brands…" value="' + esc(UI.q) + '" aria-label="Search"></div>' +
+    '<button class="fbtn' + (UI.fil || other ? " on" : "") + '" id="fbtn" data-a="fil" aria-expanded="' + UI.fil + '" aria-label="Filters' + (other ? ", " + other + " on" : "") + '">' + FILTER_ICON + (other ? '<i class="dot">' + other + "</i>" : "") + "</button></div>" +
+    gtabs + (plain ? "" : '<div class="chips catchips">' + chips + "</div>" + subchips) +
+    (plain && !UI.fil ? heroHTML() + trustHTML() + catSectionHTML() : "") +
     // Filters: a panel under the chips on phones (opened by the Filters button), a sidebar beside the grid on laptops.
     '<div class="listing' + (UI.hidefil ? " nofil" : "") + '" id="listing-top"><aside class="side' + (UI.fil ? " open" : "") + '" aria-label="Filters">' + filtersHTML() + "</aside>" +
-    '<div class="listing-main">' + toolbarHTML() + '<div class="grid" id="grid">' + gridHTML() + '</div><div id="more" style="margin-top:14px">' + moreHTML() + "</div></div></div>" + (plain ? footerHTML() : "");
+    '<div class="listing-main">' + toolbarHTML() + '<div class="grid" id="grid">' + gridHTML() + '</div><div id="more" style="margin-top:14px">' + moreHTML() + "</div></div></div>" +
+    (plain ? sellersRailHTML() + sellBandHTML() + footerHTML() : "");
 };
 V.browse = function () {
   var tops = topCats();
@@ -747,7 +737,7 @@ function renderNav() {
   // Sell button, with category links in a second row. Phones and tablets hide these (CSS) and keep the bottom tab bar.
   var topc = UI.cat ? UI.cat.split("/")[0] : "", onHome = !stack.length && tab === "home";
   var brandAndSearch = '<a class="navbrand" href="/" data-a="browse" data-i="" data-j="reset">Re<em>loved</em></a>' +
-    '<form class="navsearch" id="nf" role="search"><span class="muted" aria-hidden="true">&#9906;</span><input id="nq" type="search" placeholder="Search for items" aria-label="Search for items" value="' + esc(UI.q) + '"></form>';
+    '<form class="navsearch" id="nf" role="search">' + SEARCH_ICON + '<input id="nq" type="search" placeholder="Search for items" aria-label="Search for items" value="' + esc(UI.q) + '"></form>';
   var catRow = '<div class="navcats" role="navigation" aria-label="Categories"><a href="/" data-a="browse" data-i="" data-j="reset" class="' + (onHome && !UI.cat && !UI.q.trim() ? "on" : "") + '">Just listed</a>' +
     topCats().map(function (c) { return '<a href="' + esc(catUrl(c.path)) + '" data-a="browse" data-i="' + esc(c.path) + '" data-j="reset" class="' + (onHome && topc === c.path ? "on" : "") + '">' + esc(c.name) + "</a>"; }).join("") + "</div>";
   var util = '<div class="utilbar"><span class="util-msg">Buyer Protection on every order &middot; Meet-up delivery is free</span><span class="util-links"><a href="/home/help" data-a="go" data-i="help">Help</a><a href="/sell" data-a="tab" data-i="sell">Sell</a>' +

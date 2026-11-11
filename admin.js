@@ -15,10 +15,12 @@ function say(id, m) { var e = $(id); if (e) e.textContent = m; else toast(m); }
 V.admin = function () {
   var g = guard(); if (g) return g;
   var sc = need("ad:cnt", function () { return Promise.all([api.get("/admin/sellers?status=submitted&limit=50").catch(function () { return { items: [] }; }), api.get("/admin/catalogue/products?status=pending&limit=50").catch(function () { return { items: [] }; }), api.get("/admin/catalogue/pending-changes?limit=50").catch(function () { return { items: [] }; })]).then(function (r) { return { sellers: r[0].items.length, products: r[1].items.length, changes: r[2].items.length }; }); });
-  var n = sc.data || {}, dot = function (x) { return x ? '<span class="dot">' + x + "</span>" : ""; };
-  return head("Admin", true) + '<h3 style="margin:6px 0">Needs review</h3><div class="list">' + row("S", "Seller applications", dot(n.sellers), 'data-a="go" data-i="adsellers"') + row("P", "Product reviews", dot(n.products + n.changes), 'data-a="go" data-i="adprods"') + "</div>" +
-    '<h3 style="margin:14px 0 6px">Marketplace</h3><div class="list">' + row("O", "Orders", "", 'data-a="go" data-i="adorders"') + row("U", "Users", "", 'data-a="go" data-i="adusers"') + row("!", "Reports", "", 'data-a="go" data-i="adreports"') + (can("admin.reports.manage") ? row("★", "Seller ratings", "", 'data-a="go" data-i="adratings"') : "") + row("C", "Categories, brands, GST", "", 'data-a="go" data-i="adcat"') + row("%", "Coupons", "", 'data-a="go" data-i="adcoupons"') + "</div>" +
-    '<h3 style="margin:14px 0 6px">Money</h3><div class="list">' + row("%", "Commission", "", 'data-a="go" data-i="adcomm"') + row("₹", "Fees &amp; delivery", "", 'data-a="go" data-i="adfees"') + row("T", "Hold &amp; return rules", "", 'data-a="go" data-i="adrules"') + "</div>";
+  var n = sc.data || {}, I = R.ico, ld = sc.st === "loading";
+  function tile(k, label, x, act) { return '<button class="adtile' + (x ? " hot" : "") + '" data-a="go" data-i="' + act + '">' + I(k) + '<b>' + (ld ? "…" : x || 0) + "</b><span>" + label + "</span></button>"; }
+  function sec(t, rows) { return '<section class="grp"><h2 class="grp-h">' + t + '</h2><div class="list">' + rows + "</div></section>"; }
+  return head("Admin", true) + '<h2 class="grp-h">Needs review</h2><div class="adtiles">' + tile("store", "Seller applications", n.sellers, "adsellers") + tile("tag", "Product reviews", (n.products || 0) + (n.changes || 0), "adprods") + "</div>" +
+    sec("Marketplace", row("box", "Orders", "", 'data-a="go" data-i="adorders"') + row("users", "Users", "", 'data-a="go" data-i="adusers"') + row("flag", "Reports", "", 'data-a="go" data-i="adreports"') + (can("admin.reports.manage") ? row("star", "Seller ratings", "", 'data-a="go" data-i="adratings"') : "") + row("grid", "Categories, brands, GST", "", 'data-a="go" data-i="adcat"') + row("tag", "Coupons", "", 'data-a="go" data-i="adcoupons"')) +
+    sec("Money", row("percent", "Commission", "", 'data-a="go" data-i="adcomm"') + row("rupee", "Fees &amp; delivery", "", 'data-a="go" data-i="adfees"') + row("clock", "Hold &amp; return rules", "", 'data-a="go" data-i="adrules"'));
 };
 
 /* ---------- sellers ---------- */

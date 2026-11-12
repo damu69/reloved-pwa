@@ -8,17 +8,17 @@
   },
   "android": {
     "allowMixedContent": false,
-    "backgroundColor": "#151311"
+    "backgroundColor": "#ffffff"
   },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 800,
-      "backgroundColor": "#151311",
+      "backgroundColor": "#ffffff",
       "showSpinner": false
     },
     "StatusBar": {
-      "style": "DARK",
-      "backgroundColor": "#151311"
+      "style": "LIGHT",
+      "backgroundColor": "#ffffff"
     }
   }
 }

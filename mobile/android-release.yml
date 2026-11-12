@@ -15,7 +15,8 @@ on:
 
 jobs:
   android:
-    runs-on: ubuntu-latest
+    # ubuntu-24.04 ships the Android SDK (ANDROID_HOME set, licences accepted), so no SDK set-up step is needed.
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     defaults:
       run:
@@ -25,17 +26,18 @@ jobs:
       VERSION_CODE: ${{ inputs.version_code }}
       HAS_KEYS: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
+      - name: Check the Android SDK
+        run: echo "ANDROID_HOME=$ANDROID_HOME" && ls "$ANDROID_HOME"
       - run: npm ci
       - name: Create the Android project
         run: |

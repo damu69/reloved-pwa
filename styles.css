@@ -923,3 +923,6 @@ button.row:hover,a.row:hover{background:var(--surface)}
 .sl-more>div{padding-top:2px}
 @media (min-width:600px){.rulegrid{grid-template-columns:1fr 1fr}}
 @media (min-width:900px){.bigstat,.sl-status{max-width:760px}}
+/* "new version" bar shown when a release lands while the page is open */
+.updbar{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 10px);z-index:60;display:flex;align-items:center;gap:12px;width:max-content;max-width:calc(100% - 24px);padding:8px 8px 8px 16px;border-radius:999px;background:var(--fg);color:var(--bg);font-size:.86rem;font-weight:600;box-shadow:var(--sh)}
+.updbar button{background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:7px 14px;font-weight:700}

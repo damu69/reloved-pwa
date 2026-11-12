@@ -865,7 +865,7 @@ function enter(v, p) {
 // The page scrolls, so a new screen starts at the top and going back puts the old position back (see popstate).
 function toTop() { window.scrollTo(0, 0); }
 function go(v, p) { UI.confirm = null; navPush(); stack.push({ v: v, p: p }); enter(v, p); render(); toTop(); }
-function setTab(t) { stack = []; tab = t; UI.confirm = null; navPush(); enter(t); render(); toTop(); }
+function setTab(t) { stack = []; tab = t; UI.confirm = null; navPush(); enter(t); render(); toTop(); if (updateReady) location.reload(); }
 // If this visit pushed the current entry, step back through the browser history so its Back button stays in step;
 // popstate then restores the previous screen. Otherwise (opened from a link) just drop the top screen.
 function back() {
@@ -1053,10 +1053,32 @@ document.addEventListener("change", function (ev) {
   }
 });
 
+/* ============ updates ============ */
+// A page left open across a release keeps its old styles.css, while seller.js and admin.js load fresh when first opened,
+// so new screens would draw with old styles. Look for a new version whenever the page comes back into view; when one
+// takes over, offer a refresh, and refresh by itself at the next tab change (a clean point: nothing half-typed).
+var updateReady = false;
+function watchUpdates() {
+  var sw = navigator.serviceWorker, had = !!sw.controller;
+  sw.register("/sw.js").then(function (reg) {
+    function check() { if (!document.hidden) reg.update().catch(function () {}); }
+    document.addEventListener("visibilitychange", check);
+    setInterval(check, 30 * 60 * 1000);
+  }).catch(function () {});
+  sw.addEventListener("controllerchange", function () {
+    if (!had) { had = true; return; } // first install on this device: the page is already current
+    if (updateReady) return;
+    updateReady = true;
+    var b = document.createElement("div"); b.className = "updbar"; b.setAttribute("role", "status");
+    b.innerHTML = '<span>A new version of Reloved is ready.</span><button type="button">Refresh</button>';
+    b.querySelector("button").addEventListener("click", function () { location.reload(); });
+    document.body.appendChild(b);
+  });
+}
 /* ============ boot ============ */
 api.onLogout(function () { clearSession(); toast("Please sign in again"); stack = []; render(); });
 async function boot() {
-  if ("serviceWorker" in navigator && !(window.api && window.api.isApp)) navigator.serviceWorker.register("/sw.js").catch(function () {});
+  if ("serviceWorker" in navigator && !(window.api && window.api.isApp)) watchUpdates();
   restore(parseUrl()); // open the screen the address names (a shared item, a category, a search…)
   var first = cur();
   // A shared item link: start fetching the item now, alongside the categories, rather than after them.

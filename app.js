@@ -215,7 +215,7 @@ async function loadMe() {
 }
 async function loadCart() { try { S.cart = await api.get("/cart"); } catch (e) { if (e.status === 401) S.cart = null; } }
 async function loadWish() { try { var r = await api.get("/me/wishlist"); S.wish = {}; (r.items || []).forEach(function (i) { S.wish[i.productId] = i; }); } catch (e) { S.wish = {}; } }
-function clearSession() { S.user = null; S.perms = []; S.cart = null; S.wish = {}; C = {}; UI.ck = { addressId: "", idem: null, busy: false, adding: false, err: "" }; }
+function clearSession() { S.user = null; S.perms = []; S.cart = null; S.wish = {}; C = {}; OLD = {}; UI.ck = { addressId: "", idem: null, busy: false, adding: false, err: "" }; }
 
 function feedKey() { return [UI.q, UI.cat, UI.cond, UI.brand, UI.size, UI.colour, UI.gender, UI.sort, UI.minp, UI.maxp, UI.sellerId].join("|"); }
 function feedUrl(cursor) {
@@ -249,14 +249,18 @@ async function loadFeed(more) {
   F.loading = false; partialFeed();
   if (restoreAfterFeed != null) { window.scrollTo(0, restoreAfterFeed); restoreAfterFeed = null; } // Back to a list that had to reload
 }
+// drop() keeps the last good copy in OLD, so a screen that is refreshed after a change (a photo added, a size saved)
+// keeps showing it until the new copy arrives, instead of flashing "Loading" and jumping back to the top.
+var OLD = {};
 function need(key, fn) {
   var c = C[key];
   if (c) return c;
-  c = C[key] = { st: "loading", data: null, err: null };
+  var old = OLD[key]; delete OLD[key];
+  c = C[key] = old ? { st: "ok", data: old, err: null, stale: true } : { st: "loading", data: null, err: null };
   fn().then(function (d) { c.st = "ok"; c.data = d; refresh(); }, function (e) { c.st = "err"; c.err = errText(e); c.code = e.code; refresh(); });
   return c;
 }
-function drop(prefix) { Object.keys(C).forEach(function (k) { if (k.indexOf(prefix) === 0) delete C[k]; }); }
+function drop(prefix) { Object.keys(C).forEach(function (k) { if (k.indexOf(prefix) === 0) { if (C[k].st === "ok") OLD[k] = C[k].data; delete C[k]; } }); }
 
 /* ============ addresses ============ */
 // Every screen has its own address, so an item, a category or a search can be shared, bookmarked and found by search engines:
@@ -802,7 +806,10 @@ function render() {
   // Opened from a link: keep the server's copy of the item on screen until the app has the item, instead of "Loading…".
   var pending = v === "item" && C["item:" + c.p] && C["item:" + c.p].st === "loading";
   if (pending && main.querySelector(".ssr")) { nav.hidden = false; renderNav(); return; }
+  // Redrawing the same screen keeps the sections the person had opened (an "Edit" size, "Edit details") open.
+  var opened = same ? Array.prototype.map.call(main.querySelectorAll("details"), function (d) { return d.open; }) : null;
   main.innerHTML = (V[v] || V.home)(c.p); main.dataset.v = v + ":" + (c.p || "");
+  if (opened) Array.prototype.forEach.call(main.querySelectorAll("details"), function (d, n) { if (opened[n] && opened.length === main.querySelectorAll("details").length) d.open = true; });
   nav.hidden = v === "auth";
   renderNav(); syncUrl(); docHead();
   setNavHeight();
